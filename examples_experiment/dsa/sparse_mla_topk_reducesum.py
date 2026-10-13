@@ -324,8 +324,7 @@ def _reducesum_generic_body(
                             # rows_ub rewrite guard: previous gather-segment scalar reads drained
                             T.set_flag("s", "v", 0)
                             T.wait_flag("s", "v", 0)
-                            T.copy(Indices[s_row_0, g_0, (s % NI) * BI : (s % NI + 1) * BI],
-                                   indices_ub[islot, :])
+                            T.copy(Indices[s_row_0, g_0, (s % NI) * BI : (s % NI + 1) * BI], indices_ub[islot, :])
                             T.set_flag("mte2", "v", 0)
                             T.wait_flag("mte2", "v", 0)
                             # Vectorized row addresses (BI elements in 2 V ops):
@@ -355,9 +354,7 @@ def _reducesum_generic_body(
                             # (one multi-block MTE3 copy)
                             T.copy(
                                 kv_gather_ub[side, :, :],
-                                ws_kv[cid,
-                                      nslot * BI + vid * HALF :
-                                      nslot * BI + (vid + 1) * HALF, :],
+                                ws_kv[cid, nslot * BI + vid * HALF : nslot * BI + (vid + 1) * HALF, :],
                             )
                             T.set_cross_flag("MTE3", F0_READY_BASE + nslot)
                         else:
@@ -397,9 +394,7 @@ def _reducesum_generic_body(
                             if s < nblk:
                                 T.copy(
                                     kv_gather_ub[side, :, :],
-                                    ws_kv[cid,
-                                          nslot * BI + vid * HALF :
-                                          nslot * BI + (vid + 1) * HALF, :],
+                                    ws_kv[cid, nslot * BI + vid * HALF : nslot * BI + (vid + 1) * HALF, :],
                                 )
                                 T.set_cross_flag("MTE3", F0_READY_BASE + nslot)
 
@@ -414,8 +409,7 @@ def _reducesum_generic_body(
                         if LEAD < NI:
                             T.set_flag("v", "mte2", 0)
                             T.wait_flag("v", "mte2", 0)
-                            T.copy(Indices[s_row_0, g_0, LEAD * BI : (LEAD + 1) * BI],
-                                   indices_ub[LEAD % IDXSLOTS, :])
+                            T.copy(Indices[s_row_0, g_0, LEAD * BI : (LEAD + 1) * BI], indices_ub[LEAD % IDXSLOTS, :])
                             T.set_flag("mte2", "v", 0)
                             T.wait_flag("mte2", "v", 0)
                         else:
@@ -431,8 +425,7 @@ def _reducesum_generic_body(
                             g_l = pid_l // (seq_len * REPLICATE_H)
                             T.set_flag("v", "mte2", 0)
                             T.wait_flag("v", "mte2", 0)
-                            T.copy(Indices[s_row_l, g_l, 0:BI],
-                                   indices_ub[LEAD % IDXSLOTS, :])
+                            T.copy(Indices[s_row_l, g_l, 0:BI], indices_ub[LEAD % IDXSLOTS, :])
                             T.set_flag("mte2", "v", 0)
                             T.wait_flag("mte2", "v", 0)
 
@@ -558,8 +551,7 @@ def _reducesum_generic_body(
                                         g_h3 = pid_h3 // (seq_len * REPLICATE_H)
                                         T.set_flag("v", "mte2", 0)
                                         T.wait_flag("v", "mte2", 0)
-                                        T.copy(Indices[s_row_h3, g_h3, 0:BI],
-                                               indices_ub[(gn + 1) % IDXSLOTS, :])
+                                        T.copy(Indices[s_row_h3, g_h3, 0:BI], indices_ub[(gn + 1) % IDXSLOTS, :])
                                     else:
                                         if t + LEAD + 1 < 2 * NI:
                                             T.set_flag("v", "mte2", 0)
@@ -572,10 +564,7 @@ def _reducesum_generic_body(
                                             s_row_h = T.if_then_else(nh, s_row_n, s_row_i)
                                             g_h = T.if_then_else(nh, g_n, g_i)
                                             T.copy(
-                                                Indices[s_row_h,
-                                                        g_h,
-                                                        ((gn + 1) % NI) * BI :
-                                                        ((gn + 1) % NI + 1) * BI],
+                                                Indices[s_row_h, g_h, ((gn + 1) % NI) * BI : ((gn + 1) % NI + 1) * BI],
                                                 indices_ub[(gn + 1) % IDXSLOTS, :],
                                             )
                                 T.set_flag("mte2", "mte3", 0)
@@ -591,9 +580,7 @@ def _reducesum_generic_body(
                                 T.wait_flag("mte3", "v", 0)
                                 T.copy(
                                     kv_gather_ub[side, :, :],
-                                    ws_kv[cid,
-                                          nslot * BI + vid * HALF :
-                                          nslot * BI + (vid + 1) * HALF, :],
+                                    ws_kv[cid, nslot * BI + vid * HALF : nslot * BI + (vid + 1) * HALF, :],
                                 )
                                 T.set_cross_flag("MTE3", F0_READY_BASE + nslot)
 
@@ -620,8 +607,7 @@ def _reducesum_generic_body(
                             T.set_flag("v", "mte2", 0)
                             T.wait_flag("v", "mte2", 0)
                             T.copy(
-                                ws_acc[cid, slot * H_per_block : (slot + 1) * H_per_block,
-                                       vid * HALF : (vid + 1) * HALF],
+                                ws_acc[cid, slot * H_per_block : (slot + 1) * H_per_block, vid * HALF : (vid + 1) * HALF],
                                 acc_ub,
                             )
                             # The acc-landing wait is sunk to just before the
@@ -635,8 +621,9 @@ def _reducesum_generic_body(
                             # guard above).
 
                             # ---- Mask arithmetic chain (same V pipe, zero barriers) ----
-                            T.copy(indices_ub[n % IDXSLOTS, vid * HALF : (vid + 1) * HALF],
-                                   idx_f_ub)  # int32 -> fp32 cast (indices landed in an earlier body)
+                            T.copy(
+                                indices_ub[n % IDXSLOTS, vid * HALF : (vid + 1) * HALF], idx_f_ub
+                            )  # int32 -> fp32 cast (indices landed in an earlier body)
                             T.tile.add(t_ub, idx_f_ub, T.float32(1.0))  # t = idx + 1
                             T.tile.mul(m1_ub, idx_f_ub, T.float32(-1.0))  # m1 = -idx
                             T.tile.add(m1_ub, m1_ub, T.float32(s_i + 1))  # m1 = (s+1) - idx
@@ -659,9 +646,7 @@ def _reducesum_generic_body(
                             T.reduce_sum(acc_ub, rs_ub, dim=0, clear=True)
                             T.set_flag("v", "mte3", 0)
                             T.wait_flag("v", "mte3", 0)
-                            T.copy(rs_ub, ReduceSum[s_row_i, g_i, r_i,
-                                                    t * BI + vid * HALF :
-                                                    t * BI + (vid + 1) * HALF])
+                            T.copy(rs_ub, ReduceSum[s_row_i, g_i, r_i, t * BI + vid * HALF : t * BI + (vid + 1) * HALF])
 
                         # ---- Task tail: preload lse2d of task k+1 (the guard
                         # guarantees the k+1 row is valid). When OFFSET_N > 1,
@@ -729,9 +714,7 @@ def tl_sparse_mla_topk_reducesum(
         Callable kernel: func(Q, KV, Indices, Lse, Offsets, TokenIndices)
         -> ReduceSum [total_S, kv_group, REPLICATE_H, topk] float32.
     """
-    return _reducesum_generic_body(
-        heads, dim, tail_dim, topk, kv_group, sm_scale, block_I, grid_size
-    )
+    return _reducesum_generic_body(heads, dim, tail_dim, topk, kv_group, sm_scale, block_I, grid_size)
 
 
 # ============================================================================
