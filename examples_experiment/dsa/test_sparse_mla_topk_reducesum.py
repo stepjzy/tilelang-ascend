@@ -69,7 +69,7 @@ def ref_mla_topk_softmax(Q: torch.Tensor, K: torch.Tensor, TopkIndices: torch.Te
     return lse, topk_score
 
 
-def test_kernel(
+def run_golden_kernel(
     B=1,
     S=2048,
     H=16,
@@ -111,7 +111,16 @@ def test_kernel(
     return True
 
 
+def test_sparse_mla_topk_reducesum_accuracy() -> None:
+    """Pytest entry: gate on the golden tolerance check.
+
+    run_golden_kernel returns a bool (kept for script mode); pytest ignores
+    return values, so the gate must be an assert.
+    """
+    assert run_golden_kernel(), "attn_score exceeds tolerance (see printed err/ratio)"
+
+
 if __name__ == "__main__":
-    success = test_kernel()
+    success = run_golden_kernel()
     print("Test Passed!" if success else "Test Failed!")
     sys.exit(0 if success else 1)
