@@ -1,0 +1,66 @@
+{
+  "operator": "sparse_mla_fwd",
+  "iteration": 5,
+  "date": "2026-10-15",
+  "baseline": {
+    "ascendc_us": 64437,
+    "ascendc_std_us": 211,
+    "pto_us": 75635,
+    "pto_std_us": 194,
+    "source": "iter-3 adopted (carried through iter-4 unchanged)",
+    "main_file_state_before": "history_version/sparse_mla_fwd_perf_iter5.py (md5 == iter4 backup == iter-3 adopted)"
+  },
+  "target_us": 24288,
+  "test_shape": "B=1 S=4096 H=128 HKV=1 DQK=576 DV=512 topk=1024 bf16 (DESIGN 9.4 sentinel)",
+  "test_command": "source set_env.sh && python /tmp/opencode/t3i5/bench_fast.py (pure-kernel NPU events, warmup5+20)",
+  "precision_state_before": "pass (iter-3 state carried)",
+  "programming_mode": "hybrid: portable Developer (4-True AUTO) + fast Expert (manual flags, ascendc only)",
+  "candidate": {
+    "kind": "hybrid upgrade: tl_sparse_mla_fwd_fast (Expert-mode ring) + host fast/generic dispatch",
+    "structure": {
+      "ring": "DEPTH=2 slots on ws_kv/ws_s/ws_p/ws_o, flat block stream n=k*NI+t, LEAD=1 lookahead gather",
+      "flags": "4 families x 2 slots = 8 cross-flag ids (F0 gather MTE3 / F1A ws_s FIX / F2 ws_p MTE3 / F1B ws_o FIX), mode-2 quorum; all set/wait inside valid block segments, exact 1:1",
+      "ub_layout": "sum-of-buffers 194,560B <= 196,352B: acc_o_all 128K + acc_s_ub 32K + kv_stage[16,576] 18K + bcast_h 4K + cast_g 2K + 1D ~5K + implicit tmp_ub ~2K",
+      "c_side": "zero manual intra-core flags (gemm_v0 internal head/tail flags cover MTE2_MTE1 / FIX_M / MTE1_MTE2 / M_FIX; reducesum precedent)",
+      "gather": "4 batches x 16 rows, explicit mte3->mte2 WAR pairs (batch-start + inter-batch; cross-gather bulk NOT covered by the F-chain since gather(n+1) precedes post(n))",
+      "p_store": "per-group INTERLEAVED cast+store (platform finding P1: batched [all casts; all stores] on one slot reads the final group's content 7/8 deterministically)",
+      "dispatch_domain": "target==ascendc AND dim=512 AND tail_dim=64 AND block_I==128 AND kv_group==1 AND heads==128 AND topk%128==0; else portable"
+    },
+    "bypass_map": "RC1 (8 explicit ids <= 16), RC2 (manual flags, no static pairing), RC3 (no MEMORY_PLANNING, manual sum layout), RC4 (no planner), RC5 (slot offsets are linear scalar arithmetic, not mod-indexed TIR regions)",
+    "precision": {
+      "level_all": "Test Passed! 56 PRECISION_PASS / 0 FAIL (L0 8 + L1 48), 16 BOUNDARY_PASS, 6 WARN (bnd_extreme x4 + bnd_dbound x2, bit-identical to baseline set)",
+      "oracle": "fast vs portable bit-exact: NI in {1,2,8} x {short/neg_oob/repeat/single-segment} x 3 reps, incl. main shape x3",
+      "l0_max_abs": "out 1.562e-02 / lse 1.431e-06 (bit-identical to baseline)"
+    },
+    "perf": {
+      "fast_ascendc_us": 58763,
+      "fast_ascendc_std_us": 196,
+      "fast_ascendc_first_sample_us": 57964,
+      "fast_ascendc_first_sample_std_us": 241,
+      "portable_same_session_us": 70206,
+      "portable_same_session_std_us": 265,
+      "portable_same_session_first_sample_us": 68822,
+      "improvement_vs_recorded_baseline_pct": -8.8,
+      "improvement_same_session_ab_pct": -16.3,
+      "machine_drift_note": "portable kernel unchanged (builder untouched) but same-session re-measure is +8.9% vs the recorded 64,437 (std<0.5%, not contention-shaped) -> machine-state drift; adoption based on both metrics (each >> 3% threshold); all future comparisons use same-session A/B"
+    },
+    "vs_target": "58763/24288 = 241.9% of budget (was 265.2%); remaining 2.42x",
+    "adopted": true,
+    "new_baseline": {"ascendc_us": 58763, "pto_us": 75635, "pto_note": "unchanged portable path, number carried"}
+  },
+  "platform_findings": [
+    "P1 single cast slot + batched [all casts; all stores] -> every store reads the final group's cast (probe_a_only: deterministic 7/8 corruption); fix = per-group interleaved cast/store with adjacent mte3->v / v->mte3 pairs",
+    "P2 2D row-slice src + fp32->bf16 cast copies are VALID on ascendc (t3i2's broken form is column-slice src)",
+    "P3 copy_ub_to_gm is single-template-type: no dtype cast on the UB->GM path; bf16 stores must stage through a UB->UB cast (copy_ub_to_ub has the Cast path)",
+    "P4 whole 3D GM->UB copy still moves only the first 2D chunk (t3i3 pitfall reconfirmed in a probe)",
+    "P5 Expert-mode probes must carry ALL adjacent set/wait pairs (zero-flag probes read garbage)",
+    "P6 AUTO_CV_SYNC pairs buffers by 'workspace' name substring: Expert kernels must keep ws_* (substring-free) names to avoid double sync",
+    "P7 reducesum's bos if/else lesson is load-bearing: select-wrapped GM scalars in tile.add break the Adds codegen"
+  ],
+  "next_iteration_hints": [
+    "msprof re-profile of the fast kernel (wait/stall distribution) to calibrate the ~12.8us/block gap vs the 23us/block V-serial estimate",
+    "p-store ping-pong cast slots (cast_g x2) to remove ~8 sync roundtrips/post (UB: merge sumexp_i into t_ub[0:64], lifetimes disjoint)",
+    "gather intra-stage ping-pong (kv_stage [2,8,576]) to overlap row reads with bulk writes",
+    "ws_o bf16 re-eval under the ring (ws_o reads now on the V critical path)"
+  ]
+}

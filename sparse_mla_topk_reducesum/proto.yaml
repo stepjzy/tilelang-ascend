@@ -1,0 +1,59 @@
+# proto.yaml — sparse_mla_topk_reducesum 算子接口规格（通用路径 rev3：panel/auto 分发移除；
+# rev2 域界补注——attr/dtype 集无变化）
+# dtype 全集与 DESIGN_generic_p1.md §9.3 精度表一致（本算子为固定 dtype 组合，无 dtype 扫描维度）；
+# attr 取 §1/§4 派生（rev3 移除 panel_mode——panel/auto/shared 三模式分发及检测 kernel 已删，
+# 历史见 git 0f11b3cc 与 DESIGN_panel_mode.md）。
+# block_I 支持域（rev2 收紧，DESIGN §4.5/§11.4）：偶数且 32 <= block_I <= 128——上界为 gemm_v0
+# transpose-B L0B 乒乓槽 32KiB@kL0Size=128/bf16 硬上限（common.h L1263-1280），BI>128 不可编译。
+# 供覆盖门禁 coverage_check.py --proto 派生 D-DTYPE-*/D-PARAM-* 应覆盖维度。
+operator:
+  name: sparse_mla_topk_reducesum
+  category: Fusion  # CV 混合：gemm_v0 (Cube) + mask/exp/reduce_sum (Vector)
+  formula: |
+    ReduceSum[s, g, r, j] = sum_h exp((Q[s,h,:] · KV_main + Q_tail · KV_tail) * sm_scale
+                                      - Lse[s,h]) * causal_mask(idx <= s_i and idx != -1)
+    其中 idx = Indices[s, g, j]（seq 内相对位置，行寻址经 bos 平移）；causal 无效位贡献为 0。
+    通用语义：topk_indices 支持任意合法分布（逐行独立 / 部分共享 / 全同 / 非连续 / 乱序），
+    值域 [-1, ΣS_kv)（-1/越界经 clamp+mask 安全丢弃）；单一代码路径，无索引内容假设。
+  attrs:
+    - name: dim_v
+      type: Int
+      default: 512
+      required: false
+    - name: kv_group
+      type: Int
+      default: None  # 缺省取 kv.shape[1]
+      required: false
+    - name: sm_scale
+      type: Float
+      default: None  # 缺省 (dim + tail_dim) ** -0.5
+      required: false
+    - name: block_I
+      type: Int
+      default: 32
+      required: false
+    - name: grid_size
+      type: Int
+      default: None  # 缺省查询设备 cube_core_num（910B3 = 20）
+      required: false
+  inputs:
+    - name: q
+      dtype: [bfloat16]   # [ΣS, heads, dim+tail_dim]
+    - name: kv
+      dtype: [bfloat16]   # [ΣS_kv, kv_group, dim+tail_dim]
+    - name: topk_indices
+      dtype: [int32]      # [ΣS, kv_group, topk]，值域 [-1, ΣS_kv)，任意分布
+    - name: lse
+      dtype: [float32]    # [ΣS, heads]
+    - name: offsets
+      dtype: [int32]      # [batch+1] cu_seqlens
+    - name: token_indices  # host 预构建派生输入（prepare_token_indices）
+      dtype: [int32]      # [ΣS, 2]
+  outputs:
+    - name: reducesum
+      dtype: [float32]    # [ΣS, kv_group, REPLICATE_H, topk]
+  schema: >-
+    sparse_mla_topk_reducesum(q: Tensor[ΣS, heads, D+Dt] bf16, kv: Tensor[ΣS_kv, G, D+Dt] bf16,
+    topk_indices: Tensor[ΣS, G, topk] int32, lse: Tensor[ΣS, heads] fp32, offsets: Tensor[B+1] int32,
+    dim_v: int = 512, kv_group: int = None, sm_scale: float = None, block_I: int = 32,
+    grid_size: int = None) -> Tensor[ΣS, G, REPLICATE_H, topk] fp32

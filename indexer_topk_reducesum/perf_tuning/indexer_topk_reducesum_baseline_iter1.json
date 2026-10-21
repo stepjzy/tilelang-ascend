@@ -1,0 +1,33 @@
+{
+  "operator": "indexer_topk_reducesum",
+  "stage": "3 perf tuning",
+  "iteration": 1,
+  "date": "2026-10-14",
+  "config": {
+    "case": "l0_main",
+    "B": 1, "S": 2048, "H": 64, "D": 128, "topk": 64, "dtype": "bfloat16",
+    "offsets": [0, 2048],
+    "path": "fast (CAP=2048, QG=8, BN=32, grid=20, MIX_AIC_1_2, KL0=32)",
+    "timing": "torch.npu events, 5 warmup + 20 iters, excludes H2D/sync/host alloc/detection"
+  },
+  "baseline_perf_us": {"task_stated": 2022.1, "remeasured_fast": 2002.9, "generic": 3103.7, "full_interface": 4776.2},
+  "msprof_task_duration_us": 1942.2,
+  "precision": "Stage 2 closure: L0 24 + L1 42 + L2 13 + Boundary 4 all PASS, coverage gate 24 PASS",
+  "profiling_summary": {
+    "per_core_averages_us": {
+      "aic_wall": 1764.4, "aic_cube": 146.5, "aic_mte1": 193.9, "aic_mte2": 202.1,
+      "aic_fixpipe": 222.1, "aic_scalar": 574.1, "aic_scalar_wait_id0_cross_flag": 981.5,
+      "aiv_wall": 1778.5, "aiv_vec": 1015.6, "aiv_mte2": 528.9, "aiv_mte2_active_bw_gbs": 23.3,
+      "aiv_mte3": 63.7, "aiv_scalar": 526.2, "aiv_scalar_vector_stall": 1130.8,
+      "aiv_scalar_wait_id1": 32.9
+    },
+    "conclusion": "AIV is the critical path: vec pipe busy 1015us + mte2 529us essentially SERIALIZED (relay_ub single buffer + per-op PipeBarrier_V from RAW/WAW deps + 2x PIPE_ALL per IfThenElse node). Generated code shows 13 vector instr + ~12 PipeBarrier_V per token per block (x4 tokens) = ~52 vec ops + ~53 barriers per block. AIC has ~50% slack (981us waiting on ack back-pressure flag). mte2 relay reads issue as 256 x 64B bursts (workspace row width = BN=32 bf16 = 64B) -> only ~12.6GB/s effective vs fix write 55GB/s (512 x 64B bursts too).",
+    "iteration_plan": [
+      "iter1: V-side chain fusion - fuse 4 per-token [H,BN] elementwise chains into one [QG2*H,BN] chain (13x4 ops -> 5 ops/block), causal mask only on straddle blocks (~1/task/token vs every block), scale moved to per-task [CAP] row mul (golden-exact order), score_2d [QG2,BN] + fill(-inf) + fused 4-row store. Expect vec 1015 -> ~400us.",
+      "iter2: transposed GEMM [BN, QG*H] + wide-burst transit: relay read becomes 32x512B bursts (8x fewer), fix write 32x1KB; reduce becomes dim=-1 contiguous AR pattern.",
+      "iter3: AIC 2-ahead (ack wait j-2) + V relay ping-pong read-ahead software pipeline to hide mte2 under vec.",
+      "iter4+: BN=64 variant (halve transit pairs/flags), topk phase op audit, host _CachedLauncher for the interface metric."
+    ]
+  },
+  "target_us": 1428
+}

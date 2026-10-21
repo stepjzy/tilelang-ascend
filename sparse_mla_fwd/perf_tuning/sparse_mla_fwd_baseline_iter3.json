@@ -1,0 +1,50 @@
+{
+  "operator": "sparse_mla_fwd",
+  "iteration": 3,
+  "date": "2026-10-14",
+  "baseline": {
+    "ascendc_us": 81700,
+    "ascendc_std_us": 270,
+    "pto_us": 78565,
+    "pto_std_us": 308,
+    "source": "iter-2 adopted (perf_tuning/sparse_mla_fwd_perf_log.md Iteration 2)",
+    "reverify_ascendc_us": 81753,
+    "reverify_ascendc_std_us": 254,
+    "note": "var_full re-measure at iter-3 start, +0.06% vs iter-2 record (noise)"
+  },
+  "target_us": 24288,
+  "test_shape": "B=1 S=4096 H=128 HKV=1 DQK=576 DV=512 topk=1024 bf16 (DESIGN 9.4 sentinel)",
+  "test_command": "source set_env.sh && python /tmp/opencode/t3i3/bench.py --module var_full --target {ascendc,pto}",
+  "precision_state": "pass (iter-2 L0+L1+L2+Boundary all green, dual backend)",
+  "programming_mode": "Developer (4-True AUTO pass_configs)",
+  "profiling": {
+    "method": "cumulative paired-deletion variants, ascendc, warmup5+20, same harness as iter-1/2",
+    "var_full_us": 81753,
+    "var_nogather_us": 38360,
+    "var_nosm_us": 16598,
+    "var_nomask_us": 16552,
+    "decomposition": {
+      "gather_segment_us": 43393,
+      "gather_segment_pct": 53.1,
+      "softmax_rowop_chain_us": 21762,
+      "softmax_rowop_pct": 26.6,
+      "mask_1d_chain_us": 46,
+      "mask_1d_note": "within noise (std ~165); probe2b 8.83us/block estimate not confirmed at kernel level",
+      "residual_us": 16552,
+      "residual_note": "Q load + gemm + ws_s/p/o transit + softmax state ops + epilogue + task loop"
+    }
+  },
+  "candidate": {
+    "ascendc_us": 64437,
+    "ascendc_std_us": 211,
+    "ascendc_min_max_us": [64112, 65131],
+    "pto_us": 75635,
+    "pto_std_us": 194,
+    "pto_min_max_us": [75343, 76259],
+    "improvement_pct_ascendc": -21.1,
+    "improvement_pct_pto": -3.7,
+    "precision": "pass (L0 4/4 + L1 48/0 + L2 4/4 + Boundary 16, 6 known WARNs bit-consistent, dual backend)",
+    "adopted": true,
+    "note": "interface-level timing not re-measured this round (kernel-level口径 governs adopt/rollback)"
+  }
+}

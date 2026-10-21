@@ -1,0 +1,20 @@
+{
+  "operator": "sparse_mla_fwd",
+  "iteration": 1,
+  "date": "2026-10-14",
+  "test_shape": "B=1 S=4096 H=128 HKV=1 DQK=576 DV=512 topk=1024 bf16 (DESIGN 9.4 sentinel)",
+  "methodology": "pure kernel, torch.npu events, 20 iters after 5 warmup, NPU idle",
+  "baseline": {
+    "ascendc_pure_kernel_us": 138551, "ascendc_std": 205,
+    "pto_pure_kernel_us": 133774, "pto_std": 297,
+    "ascendc_interface_us": 137856, "pto_interface_us": 134576,
+    "source": "Stage 2 C2 sentinel (debug_log.md sparse_mla_fwd C2)"
+  },
+  "iter1_reproduction": {
+    "ascendc_pure_kernel_us": 139407, "ascendc_std": 347,
+    "note": "var_full copy in /tmp/opencode/t3i1, +0.6% vs C2 record (noise level)"
+  },
+  "target_us": 24288,
+  "programming_mode": "Developer (4-True AUTO pass_configs, F6b layout)",
+  "precision_state": "pass (L0/L1 56/0 + coverage 25/0 + --level all exit 0, Stage 2)"
+}

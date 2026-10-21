@@ -1,0 +1,35 @@
+{
+  "iteration": 6,
+  "date": "2026-10-15",
+  "operator": "sparse_mla_fwd",
+  "test_shape": "l0_main: B=1 S=4096 heads=128 kv_group=1 d_qk=576 d_v=512 topk=1024 offsets=[0,2047,4096] bf16",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_sparse_mla_fwd.py --level all / ab_run.py (pure-kernel warmup5+20, /tmp/opencode/t3i6/)",
+  "kernel_time_us": {
+    "fast_ascendc_session": 52321,
+    "fast_ascendc_std": 172,
+    "fast_ascendc_recorded_baseline": 58763,
+    "note_session_drift_pct": -11.0,
+    "candidates_rejected": {
+      "D_div_vectorize": "not bit-exact",
+      "C2_gather_pipeline": 62068,
+      "B2_pstore_pingpong": 57197,
+      "Blite_wide_cast": 57067,
+      "B2b_sumexp_merge_only": 56301
+    },
+    "pto_portable": "re-measured post-gate, see perf_log iteration 6"
+  },
+  "precision_status": "pass (level all: L0 8/8 + L1 48/0 + L2 4/4 + Boundary 16P/6W, fast oracle bit-exact NaN-aware)",
+  "programming_mode": "hybrid: portable Developer(4-True) + fast Expert(ascendc ring, iter-5)",
+  "adopted": false,
+  "rollback": "implementation identical to iter-5 adopted version (md5 d3b46163c6132a3f177144418d345cb1)",
+  "consecutive_no_improvement": 1,
+  "target_us": 24288,
+  "vs_target": "2.15x (session-metric) / ~2.4x (cross-day-corrected)",
+  "key_findings": [
+    "C/V cross-flag waits both ~0: ring fully overlapped; both sides self-bound at ~34.2us/block",
+    "AIV set_flag = blocking marker in source pipe: dangling/pre-armed sets hang (P1c), delayed consumption stalls (C2 +18.7%) -> only adjacent full-drain pairs legal; slot-level pipelining structurally inexpressible on AIV",
+    "V-side UB micro-layout hypersensitive: moving sumexp_i (256B, tail buffer) into t_ub[64:128] costs +7.6% (B2b)",
+    "scalar Divs vs vector Div differ in fp32 last bits -> per-row div cannot be vectorized under bit-exact gate",
+    "gemm_v0 internal flags are pipe-level full syncs -> C-side L1 double-buffering ineffective; QK K-merge conflicts with PV R1 column-slice constraint"
+  ]
+}

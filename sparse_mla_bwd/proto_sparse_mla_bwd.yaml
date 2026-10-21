@@ -1,0 +1,76 @@
+# proto_sparse_mla_bwd — sparse_mla_bwd 算子接口规格（Stage 1 块 D 交付）
+# 说明：本目录（examples_experiment/dsa_sparse_finetune/）为多算子共存目录，接口规格独立命名
+# proto_sparse_mla_bwd.yaml（proto_indexer_bwd.yaml 同款惯例）；覆盖门禁 coverage_check.py
+# --proto 请指向本文件。
+# dtype 全集与 DESIGN_sparse_mla_bwd.md §12.2 精度表一致（本算子为固定 dtype 组合，无 dtype
+# 扫描维度：输入 bf16/int32/fp32、输出 bf16）；attrs 取 §1.4 接口契约与 §10.1 编译期常量划分派生。
+operator:
+  name: sparse_mla_bwd
+  category: Fusion  # CV 混合：gemm_v0 6 类 (Cube) + mask/exp/dP/cast (Vector) + fp32 atomic scatter + preprocess/postprocess AIV 带宽段
+  formula: |
+    DSA 稀疏 MLA 反传（因果 varlen packed，sm_scale = 576^-0.5，逐 token s、逐 topk 索引块）：
+      preprocess: Delta[t,h] = Σ_d O[t,h,d]·dO[t,h,d]                     (fp32)
+      bwd（mask[j] = (idx_j <= s_i) & (idx_j != -1)，P 免 softmax 重计算）：
+      P[t,h,j]   = exp((q·k 分 D=512 与 D_tail=64 两段 GEMM)·sm_scale - lse[t,h])   (masked→0)
+      dP[t,h,j]  = P[t,h,j]·(Σ_d dO[t,h,d]·v[idx_j,d] - Delta[t,h])·sm_scale
+      dq[t,h,:]      += dP[t,h,:] @ kv[idx_j,:]          (D 段 + D_tail 段，fp32 跨块累加)
+      dKV[idx_j,:512] += dP[t,:,j]ᵀ·q[t,:,:512] + P[t,:,j]ᵀ·dO[t,:,:512]   (fp32 atomic scatter)
+      dKV[idx_j,512:] += dP[t,:,j]ᵀ·q[t,:,512:]          (fp32 atomic scatter)
+      postprocess: dkv = bf16(dKV_fp32)                  (单次舍入)
+  attrs:
+    - name: heads
+      type: Int
+      default: None      # 缺省取 q.shape[1]（H=64 考核 shape）；约束 % 16 == 0
+      required: false
+    - name: kv_group
+      type: Int
+      default: None      # 缺省取 kv.shape[1]（HKV，GQA 分组数）；考核 shape = 1
+      required: false
+    - name: topk
+      type: Int
+      default: None      # 缺省取 indices.shape[-1]；约束 % 16 == 0 且 % BN(=128) == 0（DESIGN §1.4/§12.3）
+      required: false
+    - name: sm_scale
+      type: Float
+      default: None      # 缺省 (D+D_tail)**-0.5 = 576^-0.5（主仓语义）
+      required: false
+    - name: is_casual
+      type: Bool         # 主仓参数名拼写如此（不得"修正"）；恒 True，kernel 内 assert 非因果不支持
+      default: true
+      required: false
+    - name: return_kernel
+      type: Bool         # 主仓接受但未使用，原样保留（接口契约 DESIGN §1.4）
+      default: false
+      required: false
+  inputs:
+    - name: q                  # [S, H, 576]（D=512 + D_tail=64）；contiguous；host 硬编码 D=512
+      dtype: [bfloat16]
+    - name: kv                 # [S, HKV, 576] 前 512 维兼作 v、后 64 维 tail；S_kv == S；contiguous
+      dtype: [bfloat16]
+    - name: o                  # [S, H, 512] 前向输出（delta 显式传入时不使用）
+      dtype: [bfloat16]
+    - name: do                 # [S, H, 512] 上游梯度
+      dtype: [bfloat16]
+    - name: indices            # [S, HKV, topk] 值域含 -1 与越界填充（如 S）——OOB 双端防护见 DESIGN §7
+      dtype: [int32]
+    - name: lse                # [S, H] 前向 logsumexp（sparse_mla_fwd 交付物）
+      dtype: [float32]
+    - name: offsets            # [B+1] varlen 段边界（packed 布局，段长 >= topk 主仓断言）
+      dtype: [int32]
+    - name: delta              # [S, H] 可选：预计算 Delta 复用入口；None 则内部跑 preprocess
+      dtype: [float32]
+    - name: token_indices      # host 预构建派生输入（prepare_token_indices，CPU 构造 + H2D）[S, 2]
+                               # =(batch_id, 段内位置)，与 sparse_mla_fwd 共用 tensor_cache（DESIGN §10.2）
+      dtype: [int32]
+  outputs:
+    - name: dq                 # [S, H, 576] bf16（UB fp32 跨块累积 + 单次 cast，DESIGN §8.3）
+      dtype: [bfloat16]
+    - name: dkv                # [S, HKV, 576] bf16（fp32 GM 终态原子区 + postprocess 单次舍入，DESIGN §4.5）
+      dtype: [bfloat16]
+  schema: >-
+    sparse_mla_bwd(q: Tensor[S, H, 576] bf16, kv: Tensor[S, HKV, 576] bf16,
+    o: Tensor[S, H, 512] bf16, do: Tensor[S, H, 512] bf16, indices: Tensor[S, HKV, topk] int32,
+    lse: Tensor[S, H] fp32, offsets: Tensor[B+1] int32, sm_scale: float = None,
+    is_casual: bool = True, return_kernel: bool = False,
+    delta: Tensor[S, H] fp32 = None) -> (dq: Tensor[S, H, 576] bf16,
+    dkv: Tensor[S, HKV, 576] bf16)

@@ -1,0 +1,80 @@
+# proto_indexer_topk_reducesum — indexer_topk_reducesum 算子接口规格
+# 说明：本目录（examples_experiment/dsa_sparse_finetune/）已有 indexer_bwd 的
+# proto_indexer_bwd.yaml 与 sparse_mla 的 proto.yaml（兄弟算子工件），为避免覆盖，
+# 本算子接口规格独立命名为 proto_indexer_topk_reducesum.yaml；
+# 覆盖门禁 coverage_check.py --proto 请指向本文件。
+# dtype 全集与 DESIGN_indexer_topk_reducesum.md §9.3 精度表一致（固定 dtype 组合，无 dtype 扫描维度）；
+# attrs 取 §1/§4/§10.4 派生（dispatch 为分派属性，indexer_bwd proto 先例）。
+operator:
+  name: indexer_topk_reducesum
+  category: Fusion  # CV 混合：gemm_v0 (Cube) + relu/broadcast-mul/reduce/mask (Vector) + 硬件 T.tile.topk/merge_sort + softmax
+  formula: |
+    前向（每序列段内，query 位置 s1、key 位置 s2，sm_scale = D**-0.5）：
+      logits[s1,h,s2] = einsum(q[s1,h,:], k[s2,:])                    # bf16 round（golden einsum 语义）
+      score[s1,s2] = (Σ_h relu(logits[s1,h,s2]) * weights[s1,h])_fp32 * sm_scale
+      score[s1,s2] = -inf  若 s2 > s1（因果 mask）
+      topk_logits[s1,:], topk_indices[s1,:] = topk(score[s1,:], k=topk)  # 降序
+      topk_score[s1,:] = softmax(topk_logits[s1,:])_fp32
+    输出：TopkIndices [ΣS, topk] int32（-1 = -inf 尾部填充位置）、
+          ReduceSum(=topk_score) [ΣS, topk] fp32（-inf 位置 softmax = 0）
+  attrs:
+    - name: heads
+      type: Int
+      default: None      # 缺省取 q.shape[1]；约束 % 8 == 0 且 <= 64（主仓语义；fast 的 M=QG*H 在 QG=8 下自动 16 对齐）
+      required: false
+    - name: dim
+      type: Int
+      default: None      # 缺省取 q.shape[2]；约束 % 16 == 0（2 的幂主仓惯例）
+      required: false
+    - name: topk
+      type: Int
+      default: None      # 必填（接口位参）；约束 2 的幂（主仓 assert）且 <= 段长
+      required: true
+    - name: sm_scale
+      type: Float
+      default: None      # 缺省 dim ** -0.5（golden 语义）
+      required: false
+    - name: dispatch
+      type: Enum         # ["auto", "fast", "generic"]（DESIGN §1.4/§10.4）
+      default: auto      # auto（缺省）：host 精确检测 max_seg_len = diff(offsets).max() ——
+                         #   <= 4096 → fast（CAP = next_pow2 档 ∈ {512,1024,2048,4096}，
+                         #   CAP<=2048 → QG=8 / CAP=4096 → QG=4）；> 4096 → generic（CH=1024 流式分段
+                         #   topk + merge_sort 池归并）。语义对所有合法输入正确；性能目标只考核
+                         #   主仓默认配置（B=1,S=2048 → fast CAP=2048）。
+                         # fast/generic：调用方显式声明或测试注入（l0_dispatch_equiv 用例）
+      required: false
+    - name: qg           # fast 路径 token 组大小（GEMM M = QG*heads；CAP 档联动，Stage 3 调优参数）
+      type: Int
+      default: None      # 缺省 CAP<=2048 → 8 / CAP=4096 → 4
+      required: false
+    - name: block_n      # fast/generic K 块宽（GEMM N 维 = 32）
+      type: Int
+      default: 32
+      required: false
+  inputs:
+    - name: q                  # IndexQ [ΣS, heads, dim]（fast kernel 内按 [ΣS, heads*dim] 二维零拷贝解释）
+      dtype: [bfloat16]
+    - name: weights            # Weights [ΣS, heads]
+      dtype: [bfloat16]
+    - name: k                  # IndexK [ΣS, dim]
+      dtype: [bfloat16]
+    - name: offsets            # Offsets [batch+1] cu_seqlens（varlen，段长 >= topk，golden assert 同款）
+      dtype: [int32]
+    - name: token_indices      # host 预构建派生输入（prepare_token_indices，CPU 构造 + H2D）[ΣS, 2]
+                               # （接口行为保持，GPU 参考同款；kernel 侧不消费，供下游/测试一致性）
+      dtype: [int32]
+    - name: group_table        # host 预构建派生输入（prepare_group_table，CPU 构造 + H2D）[num_groups, 3]
+                               # = (bos, t0_local, len)，per 段 ceildiv(len, QG) 行（indexer_bwd
+                               # BlockIndices 同款先例；fast/generic 共用）
+      dtype: [int32]
+  outputs:
+    - name: topk_indices       # TopkIndices [ΣS, topk]，值域 [-1, 段长)；-1 = -inf 尾部位置
+                               # （GPU kernel 同款语义；golden 在这些位置为任意 -inf 平局索引，测试 mask 域比对）
+      dtype: [int32]
+    - name: topk_score         # ReduceSum [ΣS, topk] = softmax(topk_logits) fp32；-inf 位置 = 0
+      dtype: [float32]
+  schema: >-
+    indexer_topk_reducesum(q: Tensor[ΣS, H, D] bf16, weights: Tensor[ΣS, H] bf16, k: Tensor[ΣS, D] bf16,
+    topk: int, offsets: Tensor[B+1] int32, dtype: str = bfloat16, heads: int = None, dim: int = None,
+    sm_scale: float = None, dispatch: str = "auto", qg: int = None, block_n: int = 32)
+    -> (topk_indices: Tensor[ΣS, topk] int32, topk_score: Tensor[ΣS, topk] float32)

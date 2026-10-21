@@ -1,0 +1,51 @@
+{
+  "iteration": "3b",
+  "date": "2026-10-16",
+  "operator": "sparse_mla_bwd",
+  "shape": "B=1,S=2048,H=64,HKV=1,DQKV=576,DV=512,topk=512,bf16",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_sparse_mla_bwd.py --level all",
+  "bench_command": "python /tmp/opencode/b3i3b/bench_v.py {ascendc|pto} sparse_mla_bwd (do_bench warmup=250 rep=100 mean)",
+  "baseline_start": {
+    "ascendc_us": 28762.2,
+    "ascendc_source": "iter3_profile.md 2026-10-16 11:12 复测 (rev3 交付态, md5 625c3ba1)",
+    "pto_us_iter2_adopted": 30226.5
+  },
+  "baseline_this_round_backups": {
+    "v0_stock": "history_version/sparse_mla_bwd_perf_iter3b_v0.py (rev3 交付态逐位)",
+    "v1_adopted": "history_version/sparse_mla_bwd_perf_iter3b_v1.py (P1b 删除)",
+    "v2_final": "history_version/sparse_mla_bwd_perf_iter3b_v2.py (v1 + 三档 env 选项代码, 默认=v1 行为)"
+  },
+  "candidate_final": {
+    "ascendc_us_early_window": 27339.1,
+    "ascendc_us_recheck": 27382.4,
+    "ascendc_us_final_window": 27387.6,
+    "pto_us": 29196.5,
+    "ab_same_window": {
+      "stock_ascendc_us": 28230.9,
+      "current_ascendc_us": 27387.6,
+      "delta_us": -843.3,
+      "delta_pct": -3.0
+    },
+    "note": "会话级漂移 ±2% (27339-28443 同代码); 两窗口 A/B 同向: 早窗口 -1423us/-4.9% (vs 画像 28762), 晚窗口 -843us/-3.0%"
+  },
+  "improvement_pct_vs_28762": -4.8,
+  "precision": {
+    "level_all": "Test Passed! L0 9/9 + L1 15/15 (阻塞级) + L2 9 正确拒绝 + boundary 记录级",
+    "valrange_asym_dq_ratio": 0.3011,
+    "dq_vs_stock": "bit-identical (V1 无数据路径改动, 3 case 验证)",
+    "dkv_vs_stock": "max diff 2.0 << stock 自身原子序噪声带 16.0 (数值等价)"
+  },
+  "experiments": [
+    {"id": "V1 P1b 探针删除", "adopted": true, "delta_us": -1423, "precision": "pass (数值与 stock 逐位等价)"},
+    {"id": "V2 scatter 微读 2->1", "adopted": false, "blocked_by": "AUTO_CV_SYNC 配对: workspace_dkv cube 2 vs vec 1"},
+    {"id": "V3 dq accumulate 双槽交替", "adopted": false, "blocked_by": "combinecv 循环归并: workspace_dq cube 2 vs vec 3"},
+    {"id": "dkv 槽 fp16 (SPARSE_MLA_BWD_DKV_SLOT=fp16)", "adopted": false, "delta_us": +1425, "precision": "L0 9/9 pass (dkv ratio 0.9963-1.0000 vs bf16 档 0.965-0.983)", "reason": "微事务结构下字节减半无收益, per-row cast 反增开销"},
+    {"id": "dq 槽 bf16 (SPARSE_MLA_BWD_DQ_SLOT=bf16)", "adopted": false, "delta_us": -683, "precision": "L0 9/9 pass (dq ratio 0.9983-1.0000)", "reason": "bulk 字节节省 < V 侧 cast+barrier 串行开销"},
+    {"id": "KV gather 批量化", "adopted": false, "blocked_by": "无 GM 索引 gather 原语 (T.gather 仅 UB 内; fwd 同为逐行形态)"},
+    {"id": "pst 复活 (SPARSE_MLA_BWD_PST=1)", "adopted": false, "delta_us": +672, "precision": "L0 9/9 pass (bit-exact 转发)", "reason": "省的 M2 重读被同尺寸 pst 读回抵消, M3 写净增; rev2 两遍结构下的收益在 rev3 stagger 下不存在"}
+  ],
+  "bottleneck_type": "transfer+sync (V 侧 MTE 微事务发射/同步结构受限——字节优化实测无效)",
+  "consecutive_no_improvement": 0,
+  "design_error": true,
+  "design_error_note": "维持 iter-2/iter-3 画像结论: 数据流地板 ~18-20ms > 7680us 目标; 本轮 5 项实验全部撞 AUTO 栈结构性约束或负收益, 进一步佐证需架构级数据流削减 (Orchestrator 已裁决不回退设计, 本轮为收获轮)"
+}

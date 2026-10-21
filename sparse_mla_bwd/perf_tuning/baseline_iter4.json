@@ -1,0 +1,22 @@
+{
+  "iteration": 4,
+  "date": "2026-10-16",
+  "kernel_time_us": 27387.6,
+  "kernel_time_note": "ascendc full-interface do_bench(warmup=250,rep=100) mean, iter3b adopted state (v1 = P1b probe removal); same-window back-to-back stock control 28230.9us; profile baseline 28762.2 (iter3_profile)",
+  "shape": "B=1,S=2048,H=64,HKV=1,DQKV=576(D=512,tail=64),DV=512,topk=512,bf16",
+  "test_cmd": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_sparse_mla_bwd.py --level all",
+  "precision": "pass (iter3b full gate: L0 9/9 + L1 15/15 + L2 9 + coverage 24 PASS, both backends)",
+  "programming_mode": "Developer (rev3 pair-loop, AUTO 4-True pass_configs)",
+  "target_us": 7680,
+  "bottleneck_this_iter": "id14 2.26ms zero-distance same-token produce-chain dependency (V P-chain waits C's ws_s G1 flush in the same iteration)",
+  "plan": "2-token stagger: V P-chain lags G1 by one full task; C consume lags produce by 2 tasks; PARITY_GM=3 for ws_kv/ws_s/ws_dp; G5/G5'/G6 q/dO GM direct-read (single-task q_all/do_all L1 slots)",
+  "paper_audit": {
+    "UB_192KB": "unchanged ~184KB time-sliced (segment order gather->P-chain->consume is isomorphic to current gather->Pchain->consume; only token indices shift)",
+    "L1_512KB": "416KB (81%): v_all 128 + tail 16 + q_all[2,64,256] 64 + qt 8 + do_all 64 + p/dp_l1 64 + q5 32 + qt5 8 + do5 32; plain 3-parity q/do would need 616KB > 512KB hence GM direct-read for G5 operands",
+    "L0C_128KB": "unchanged (block-local acc time-sharing preserved)",
+    "GM_L2_192MiB": "~148MB (74%): kv 44.2 + s/dp 19.6 + p/dpb 10.5 + dq 23.6 + dkv 46 (fp32 default) + final 4.5; mixed parity (kv/s/dp=3, rest=2) instead of uniform 3 (169MB, 84%) to protect L2 absorption margin",
+    "slot_safety": "ws_kv: writer gather(p)@p*NI+pi, last reader G3(p)@(p+2)*NI+pi, overwrite gather(p+3) -> depth 3 required (depth 2 = same-iteration WAR unsafe). ws_s/dp: last reader P-recompute(p)@(p+2)*NI+pi, overwrite G1(p+3) -> depth 3. ws_p/dpb/dq/dkv: flag-protected same-token + NI-iteration overwrite distance -> depth 2 suffices",
+    "flags": "16 pairs unchanged (statement counts per workspace buffer identical: ws_s C 1 write+1 dummy vs V 2 reads; ws_kv V 1 stash+1 dummy vs C 2 read groups)"
+  },
+  "rollback_baseline": "history_version/sparse_mla_bwd_perf_iter4_v0.py (md5 76682f43ca6e2859191e2dbd6735b68e)"
+}

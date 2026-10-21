@@ -1,0 +1,37 @@
+{
+  "task": "PTO fast path pure-kernel latency optimization (structure-factor convergence)",
+  "date": "2026-10-16T01:48:56Z",
+  "operator": "indexer_topk_reducesum",
+  "iteration": 0,
+  "config": {
+    "shape": "B=1,S=2048,H=64,D=128,topk=64,bf16,offsets=[0,2048]",
+    "path": "fast (CAP=2048,QG=8,BN=32,grid=20,KL0=32)",
+    "backend": "pto",
+    "timing": "torch.npu Event, 5 warmup + 20 iters avg, 3 repeats, NPU clear-state verified (npu-smi snapshot before/after)"
+  },
+  "baseline_perf": {
+    "fast_pure_kernel_us": 6587.4,
+    "reps": [6590.9, 6585.8, 6585.4],
+    "task_sheet_reference_us": 6554.1,
+    "drift_pct": 0.5
+  },
+  "reference_points": {
+    "pto_generic_us": 7370.8,
+    "ascendc_fast_us": 1157.8,
+    "ascendc_generic_us": 3096.6,
+    "backend_factor_generic_vs_generic": 2.38,
+    "structure_target_us": "2700-3000 (ascendc_fast x backend_factor ~ 1157.8*2.4 = 2779)"
+  },
+  "precision_state": "pass (phase-4b stock framework: 3x 49/49 full runs)",
+  "programming_mode": "Developer (shared body, explicit if target==pto branches)",
+  "static_analysis_of_generated_code": {
+    "file": "/tmp/opencode/t3pto/gen_fast_l0main_pto.cc",
+    "transit_write": "copy_l0c_to_gm_dynamic [512,32] -> 512 rows x 64B (generic orientation; vs ascendc [32,512] 1KB rows)",
+    "transit_read": "copy_gm_to_ub_dynamic [256,32] contiguous 16KB (vs ascendc 32x512B strided wide bursts)",
+    "backpressure": "wait-before-produce serialized single-flight (vs ascendc produce-then-wait ping-pong)",
+    "vector_chain": "per-token loop 4x13 ops (vs ascendc fused [32,256] big-tile ~10 ops)",
+    "per_token_redundant_sync": "set_flag(MTE2,V,ID2)+wait emitted INSIDE u-loop x4 (relay dependency re-checked per token)",
+    "note": "both backends carry comparable PIPE_ALL counts from the stock sync-insert pass (if-node tax)"
+  },
+  "goal": "converge structure factor (~2.4x): transpose wide-burst transit + overlapped backpressure + fused vector chain in PTO-safe forms; report honestly if backend factor wall is hit"
+}

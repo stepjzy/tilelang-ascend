@@ -1,0 +1,78 @@
+# proto_indexer_bwd — indexer_bwd 算子接口规格（rev2，双路径分派架构）
+# 说明：本目录（examples_experiment/dsa_sparse_finetune/）已有 sparse_mla_topk_reducesum 的
+# proto.yaml（兄弟算子工件），为避免覆盖，indexer_bwd 的接口规格独立命名为 proto_indexer_bwd.yaml；
+# 覆盖门禁 coverage_check.py --proto 请指向本文件。
+# dtype 全集与 DESIGN.md §9.3 精度表一致（本算子为固定 dtype 组合，无 dtype 扫描维度）；
+# attr 取 §1/§4/§5.2 派生；rev2 新增 dispatch（分派属性，DESIGN §1.4/§10.4，panel_mode 先例）。
+operator:
+  name: indexer_bwd
+  category: Fusion  # CV 混合：gemm_v0 (Cube) + relu/broadcast/compare/reduce (Vector) + DMA fp32 atomic scatter
+  formula: |
+    反向（每 token t，遍历 topk 索引 pos，causal mask 为 -1 < pos <= t，sm_scale = D**-0.5）：
+      logits[t,h,pos] = relu(q[t,h,:]·k[pos,:] * sm_scale)
+      d_logits[t,h,pos] = (IndexScore[t,pos] - AttnScore[t,pos]) * 1{logits>0} * Weights[t,h]
+      dWeights[t,h] += Σ_pos (IndexScore - AttnScore)[t,pos] * logits[t,h,pos]
+      dIndexQ[t,h,:] += Σ_pos d_logits[t,h,pos] * IndexK[pos,:] * sm_scale
+      dIndexK[pos,:] += Σ_h d_logits[t,h,pos] * IndexQ[t,h,:] * sm_scale   # atomic scatter-add（fp32 工作区累加 + 尾部 cast，输出需零初始化）
+  attrs:
+    - name: heads
+      type: Int
+      default: None      # 缺省取 q.shape[1]；约束 % 16 == 0 且 <= 64（Cube 分形粒度）
+      required: false
+    - name: dim
+      type: Int
+      default: None      # 缺省取 q.shape[2]；约束 % 16 == 0
+      required: false
+    - name: topk
+      type: Int
+      default: None      # 缺省取 topk_indices.shape[-1]；约束 2 的幂（主仓语义）；fast 路径支持域 topk ∈ {16,32,64}，topk=128 自动走 generic
+      required: false
+    - name: sm_scale
+      type: Float
+      default: None      # 缺省 dim ** -0.5（主仓语义）
+      required: false
+    - name: block_I
+      type: Int
+      default: None      # generic 路径 topk 方向 tile；缺省 min(topk, 64)；约束 % 16 == 0
+      required: false
+    - name: dispatch
+      type: Enum         # ["auto", "fast_arange", "fast_shared", "generic"]（DESIGN §1.4/§10.4）
+      default: auto      # auto（缺省）：host 精确检测（非启发式）——topk_indices 全 token arange 平铺
+                         #   → fast layout=0；全部行严格相等 → fast layout=1；否则 generic。
+                         #   语义对所有输入正确；性能目标只考核主仓默认配置（arange 平铺 → fast layout=0）。
+                         # fast_arange/fast_shared/generic：调用方显式声明或测试注入（l0_dispatch_equiv 用例）
+      required: false
+  inputs:
+    - name: q                  # IndexQ [ΣS, heads, dim]（fast kernel 内按 [ΣS, heads*dim] 二维零拷贝解释）
+      dtype: [bfloat16]
+    - name: weights            # Weights [ΣS, heads]
+      dtype: [bfloat16]
+    - name: k                  # IndexK [ΣS, dim]
+      dtype: [bfloat16]
+    - name: attn_score         # AttnScore [ΣS, topk]（teacher 概率，fp32）
+      dtype: [float32]
+    - name: index_score        # IndexScore [ΣS, topk]（student log_softmax 概率，fp32）
+      dtype: [float32]
+    - name: topk_indices       # TopkIndices [ΣS, topk]，值域 [-1, ΣS)（-1 仅 generic 路径处理；fast 契约下无 -1）
+      dtype: [int32]
+    - name: offsets            # Offsets [batch+1] cu_seqlens（varlen，段长 >= topk）
+      dtype: [int32]
+    - name: token_indices      # host 预构建派生输入（prepare_token_indices，CPU 构造 + H2D）[ΣS, 2]，generic 路径用
+      dtype: [int32]
+    - name: block_indices      # host 预构建派生输入（prepare_block_indices，CPU 构造 + H2D）[num_blocks, 3]
+                               # =(bos, t0_local, seq_len)，per 段 ceildiv(len, T_BLOCK) 行，fast 路径用（rev2 新增）
+      dtype: [int32]
+  outputs:
+    - name: d_q                # dIndexQ [ΣS, heads, dim]
+      dtype: [bfloat16]
+    - name: d_weights          # dWeights [ΣS, heads]
+      dtype: [bfloat16]
+    - name: d_k                # dIndexK [ΣS, dim]（fp32 工作区 ws_dk 累加 + 尾部 cast kernel 产出，host 零初始化）
+      dtype: [bfloat16]
+  schema: >-
+    indexer_bwd(q: Tensor[ΣS, H, D] bf16, weights: Tensor[ΣS, H] bf16, k: Tensor[ΣS, D] bf16,
+    attn_score: Tensor[ΣS, topk] fp32, index_score: Tensor[ΣS, topk] fp32,
+    topk_indices: Tensor[ΣS, topk] int32, offsets: Tensor[B+1] int32,
+    heads: int = None, dim: int = None, topk: int = None, sm_scale: float = None,
+    block_I: int = None, dispatch: str = "auto") -> (d_q: Tensor[ΣS, H, D] bf16,
+    d_weights: Tensor[ΣS, H] bf16, d_k: Tensor[ΣS, D] bf16)

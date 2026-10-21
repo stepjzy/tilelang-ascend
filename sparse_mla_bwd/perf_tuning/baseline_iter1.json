@@ -1,0 +1,64 @@
+{
+  "operator": "sparse_mla_bwd",
+  "iteration": 1,
+  "date": "2026-10-15T00:20-01:30",
+  "target_shape": {
+    "B": 1, "S": 2048, "H": 64, "HKV": 1, "DQKV": 576, "DV": 512,
+    "topk": 512, "dtype": "bfloat16", "offsets": [0, 2048]
+  },
+  "goal_us": 7680,
+  "measurement": {
+    "criterion": "tilelang.profiler.do_bench(fn, warmup=250, rep=100) mean, fn = full sparse_mla_bwd interface call (delta=None, bwd+postprocess two launches) — main-repo criterion",
+    "cross_check": "NPU event timing warmup5+30, no L2 flush",
+    "inputs": "make_case_inputs seed=0 (main-repo randperm causal flow); (o,lse) via in-test torch fallback"
+  },
+  "baseline_before": {
+    "ascendc_full_interface_us": 56363.8,
+    "pto_full_interface_us": 57210.7,
+    "session_k2_event_ascendc_us": 56145.7
+  },
+  "adopted_result": {
+    "ascendc_full_interface_us": 32586.0,
+    "pto_full_interface_us": 32823.9,
+    "ascendc_xcheck_mean_us": 32564.4,
+    "pto_xcheck_mean_us": 32877.7,
+    "k2_event_ascendc_us": 31181.3,
+    "k2_event_pto_us": 32983.6,
+    "improvement_pct_vs_iter0": {"ascendc": -42.2, "pto": -42.6},
+    "assessment_backend": "ascendc"
+  },
+  "diagnostics": {
+    "var_noatomic_k2_us": 33369.5,
+    "var_noatomic_delta_us": 22776.2,
+    "var_noatomic_delta_pct_of_k2": 40.6,
+    "var_writescatter_k2_us": 54778.7,
+    "atomic_premium_us": 1367.0,
+    "atomic_premium_pct": 2.4,
+    "conclusion": "atomic RMW is nearly free; the dkv-path cost is the per-row serialized issue path (3x PIPE_ALL + sync GM scalar load of Indices + 5 micro-reads + 5 MTE2->MTE3 handshakes per row, 26112 rows/AIV). DESIGN §6.5 scheme 2 (private+reduce) REJECTED."
+  },
+  "changes_adopted": [
+    "gather full+mini staging: per-row GM reads land in kv_stage [HALF, DDT] UB, ONE whole-2D MTE3 burst writes the AIV half-block + idempotent 1-row rewrite pairs the C-side tail read (both passes; 320 micro-writes + 256 handshakes per block -> 2 statements)",
+    "scatter payload slimming: pos sourced from idx_ub (UB, bit-equal to Indices) instead of a synchronous GM scalar load; 4x512B segment micro-reads merged into ONE [dim]-wide 2KB read; statement count and CV pairing unchanged"
+  ],
+  "changes_blocked": {
+    "3_3_staged_scatter": "needs a 17th cross-core flag pair (hardware limit 16)",
+    "ws_p_dpb_3d_merge": "T.copy over 3D regions spanning a ranged dim of a 4D workspace SILENTLY TRUNCATES to the first 2D plane (both backends; smoke signature dQ bit-identical + dkv ~50% corrupted)",
+    "g3_g4_5seg_fusion": "640-wide zero-padded stash trips host-compiler SEGV in the CV pairing analysis at NI=4 (Vec/cube loop-times family), NI=1 passes",
+    "fp32_pd_transit": "gemm_v0 C++ template requires both operands to share one dtype (fp32 P/dP x bf16 KV infeasible)"
+  },
+  "flag_pair_budget": "16 (unchanged): kv 4 + s 2 + dp 2 + p 2 + dpb 2 + dq 2 + dkv 2",
+  "precision": "pass — test_sparse_mla_bwd.py --level all 'Test Passed!' (44 PRECISION_PASS, L0 9/9 + L1 15/15 blocking, L2/Boundary recorders; boundary WARNs bit-identical to iter-0 records) + variant smoke 12/12 dual-backend dual-delta-path vs stock sim 1.0000000 (dQ/dkv)",
+  "msprof_after": {
+    "task_duration_us": 32623.9,
+    "aiv": {"mte2_us": 12166.4, "mte2_bw_gbs": 10.87, "mte3_us": 6036.0, "mte3_bw_gbs": 15.76, "vec_us": 1788.1, "scalar_us": 3720.1, "flag_waits_us_total": 13205.3},
+    "aic": {"cube_us": 2659.5, "fixpipe_us": 3019.1, "fixpipe_bw_gbs": 72.9, "mte1_us": 2651.7, "mte2_us": 2734.1, "scalar_us": 5589.3, "wait_id8_us": 11315.0, "wait_id10_us": 10096.5},
+    "interpretation": "MTE3 22.6ms->6.0ms (gather staging); V-side serialized issue eliminated on gather; remaining structural item = lockstep flag round-trips (~6+ per block x 1632 block-visits/AIV; AIC waits 21.4ms on stash flags, AIV waits 13.2ms on C flags) + ws_dkv readback still per-row (2 reads/row)"
+  },
+  "remaining_vs_goal": "32586 vs 7680us target — 4.24x over; iter-2 targets: ws_dkv readback batching (needs the blocked -1 flag), k3 row-width (810us pool), lockstep structure (architecture-level, AUTO stack blocked per fwd iter-4 RC1-RC5)",
+  "artifacts": {
+    "variants": "/tmp/opencode/b3i1/{var_noatomic,var_writescatter,var_merge,var_gfs,var_gf,var_g,var_g576,var_gs}.py + driver_{noatomic,writescatter,var}.py + probe_forms.py + probe_isolate.py + probe_col.py",
+    "logs": "/tmp/opencode/b3i1/{smoke_gs_asc,smoke_gs_pto,gate_iter1,build_*}.log + msprof_iter1/",
+    "generated_sources": "/tmp/opencode/b3i1/kernel_src_{gs,merge}.cpp",
+    "backup": "history_version/sparse_mla_bwd_perf_iter1.py"
+  }
+}

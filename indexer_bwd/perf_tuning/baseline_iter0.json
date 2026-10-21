@@ -1,0 +1,30 @@
+{
+  "operator": "indexer_bwd",
+  "stage": 3 perf tuning",
+  "iteration": 0,
+  "date": "2026-10-11",
+  "config": {
+    "case": "l0_default",
+    "S": 2048, "H": 16, "D": 128, "topk": 64, "dtype": "bfloat16",
+    "offsets": [0, 1023, 2048],
+    "path": "fast layout=0 + cast kernel, back-to-back",
+    "timing": "torch.npu events, 5 warmup + 20 iters, excludes H2D/sync/host alloc/detection"
+  },
+  "baseline_perf_us": 1229.9,
+  "baseline_perf_us_task_stated": 1173.9,
+  "precision": "L0 7 + L1 17 all PASS (rev2 closure, debug_log attempt rev2)",
+  "profiling_summary": {
+    "msprof_task_duration_fast_only_us": 223.7,
+    "per_block_us": 54.7,
+    "aic_per_block_us": {"wall": 54.66, "cube": 2.28, "mte1": 2.68, "mte2": 11.94, "fix": 3.94, "scalar_wait_id0_cross_flag": 50.47},
+    "aiv_per_block_us": {"wall": 54.93, "vec": 21.81, "mte2": 4.79, "mte3": 6.31, "scalar_wait_id2": 17.04, "scalar_wait_id3": 8.07, "scalar_vector_stall": 15.90},
+    "host_launch_us": {"fast_enqueue": 750, "cast_enqueue": 480, "low_level_lib_call": 12.9, "current_stream_query": 33.5, "raw_stream_query": 0.9, "analyzer_construction": 550},
+    "conclusion": "measured 1229.9us is launch-bound: ~750us (fast) + ~480us (cast) host enqueue vs 223.7us device. Device side is CV-lockstep bound (AIC waits 50.5/54.7us on cross-core flag id0; V issue-bound on ~24 vec ops + ~15 PipeBarriers per token)."
+  },
+  "target_us": 80,
+  "plan": [
+    "iter1: cached low-level launcher (bypass cython re-marshal + Analyzer) -> expect ~250-280us (device-bound)",
+    "iter2: device restructure: C/V software pipeline across sub-tiles, flat-2D Q load + direct dq L0C->GM write, bf16 logits transit, big-tile [TS*H, topk] vector chain",
+    "iter3+: T_BLOCK/TS sweep, block-index scalar read packing, dlog single buffer, cast fusion"
+  ]
+}

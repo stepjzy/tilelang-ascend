@@ -1,0 +1,57 @@
+{
+  "operator": "sparse_mla_fwd",
+  "iteration": 4,
+  "date": "2026-10-14",
+  "baseline": {
+    "ascendc_us": 64437,
+    "ascendc_std_us": 211,
+    "pto_us": 75635,
+    "pto_std_us": 194,
+    "source": "iter-3 adopted (perf_tuning/sparse_mla_fwd_perf_log.md Iteration 3)",
+    "main_file_state": "unchanged this round (== history_version/sparse_mla_fwd_perf_iter4.py, md5 verified)"
+  },
+  "target_us": 24288,
+  "test_shape": "B=1 S=4096 H=128 HKV=1 DQK=576 DV=512 topk=1024 bf16 (DESIGN 9.4 sentinel)",
+  "test_command": "source set_env.sh && python /tmp/opencode/t3i4/bench_v.py --module var_wsobf16 --target {ascendc,pto}",
+  "precision_state": "pass (iter-3 state carried; main kernel untouched)",
+  "programming_mode": "Developer (4-True AUTO pass_configs)",
+  "probe": {
+    "kind": "AUTO_CV_SYNC ring-rotation pairing semantics (P2 preflight)",
+    "workdir": "/tmp/opencode/t3i4/ (gen_probes.py + probe_run.py + 27 generated probe modules + logs)",
+    "verdict": "RING BLOCKED on the current AUTO_CV_SYNC + MemoryPlanning stack; root causes all source-verified",
+    "root_causes": [
+      "RC1 flag budget: AscendC CrossCoreSetFlag lowers to GetffstMsg(flagId & 0xf) -- 16 hardware flag slots. AutoInsertCrossCoreSync assigns one flag id per STATIC statement pair; a 2-slot ring with prologue/drain peeling needs >= 18 pairs (3-stmt gather) or breaks static multiplicity matching (9-stmt gather: 36 pairs at NI=3 -> cross-pair aliasing -> massive corruption, maxdiff 48+)",
+      "RC2 pairing is over STATIC TIR statements with loop-nest multiplicity matching (FindTargetLoopDepth 'loop times'): V/C statements must live in identical loop nests (same var names + extents) for per-statement flag rotation; prologue(out-of-loop) producers paired with in-loop consumers yield stale flags after the first iteration",
+      "RC3 planner liveness is ONE interval per buffer over the linearized body (loop bodies recorded once; out-of-loop touch extends the kill to loop end): ring interleavings (gather of next block between sm/add of current) make kv_stage's interval span the softmax scratch -> iter-2's kv_stage<->acc_s_ub aliasing is withdrawn -> UB overflows (217.6KB > 196.35KB)",
+      "RC4 planner bugs: LinearScanAllocator::findReusableBlock indexes free_blocks.back() on an EMPTY vector (UB overflow turns into segfault); buffer_map_ stores pointers into `intervals` before std::sort (dangling, latent)",
+      "RC5 Mod region index: hardware aicore exception (re-confirmed AFTER the RowBlock fix -- independent of the kv_stage race; matches t3i2 pitfall) -> 3+-slot rings (cyclic slot arithmetic) are not expressible"
+    ],
+    "positive_results": [
+      "lock0 (lockstep + RowBlock indirection): PASS NI in {8,5,3,1} both backends (golden + rep-stable) -- the gather's per-row indices_ub GetValue is LOAD-BEARING: it marks the access sliced -> intra-core pass inserts PipeBarrier<PIPE_ALL> before each row copy (drains the previous iteration's MTE3 kv_stage reads). Pure-arithmetic row addressing gets only PIPE_MTE2 -> cross-iteration WAR race on kv_stage (NTASK>GRID corrupts with NaN, NTASK==GRID clean)",
+      "ra4 NI=2 (no-loop ring form): PASS -- per-statement rotation works when all pairs fit the static structure",
+      "rc (clamp ring, 12 flags): passes the statement-count check cleanly -- blocked ONLY by RC3 (UB aliasing for the 32KB staging)"
+    ],
+    "secondary_eval": {
+      "ws_o_bf16": {
+        "verdict": "blocker lifted but NOT adopted",
+        "detail": "iter-1 blocker (copy_gm_to_ub without cast) reproduced on the direct path; a GM->UB same-dtype hop through cast_bf16 + UB->UB cast (indices_ub->idx_f precedent) compiles and passes L0 8/8 on BOTH backends; C-side L0C(fp32)->GM(bf16) cast copy works",
+        "perf": {
+          "ascendc_us": 63683,
+          "ascendc_std_us": 286,
+          "improvement_pct_ascendc": -1.17,
+          "pto_us": 72023,
+          "pto_std_us": 252,
+          "improvement_pct_pto": -4.78
+        },
+        "no_adopt_reason": "primary backend gain -1.17% is below the 3% noise threshold; precision headroom cost (l0 out max_abs 1.562e-02 -> 3.125e-02, bf16 addend rounding). Pto gain parked for a pto-priority decision"
+      }
+    }
+  },
+  "candidate": {
+    "adopted": false,
+    "ascendc_us": 63683,
+    "pto_us": 72023,
+    "precision": "pass (L0 8/8 dual backend on the variant)",
+    "note": "no adoption: ascendc -1.17% < 3% threshold; baseline 64437/75635 retained"
+  }
+}

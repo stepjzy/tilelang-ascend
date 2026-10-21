@@ -1,0 +1,72 @@
+{
+  "operator": "sparse_mla_bwd",
+  "iteration": 2,
+  "date": "2026-10-15T01:30-03:10",
+  "target_shape": {
+    "B": 1, "S": 2048, "H": 64, "HKV": 1, "DQKV": 576, "DV": 512,
+    "topk": 512, "dtype": "bfloat16", "offsets": [0, 2048]
+  },
+  "goal_us": 7680,
+  "measurement": {
+    "criterion": "tilelang.profiler.do_bench(fn, warmup=250, rep=100) mean, fn = full sparse_mla_bwd interface call (delta=None, bwd+postprocess two launches) — main-repo criterion",
+    "cross_check": "NPU event timing warmup5+30, no L2 flush",
+    "inputs": "make_case_inputs seed=0 (main-repo randperm causal flow); (o,lse) via in-test torch fallback"
+  },
+  "baseline_before": {
+    "ascendc_full_interface_us": 32586.0,
+    "pto_full_interface_us": 32823.9,
+    "session_stock_recheck_ascendc_us": 31898.1,
+    "session_stock_k2_event_ascendc_us": 32505.5,
+    "session_drift_note": "same-session stock do_bench 31898.1 vs iter-1 record 32586.0 (-2.1%); improvements below quoted vs the recorded iter-1 baseline, and also exceed 3% vs the same-session recheck"
+  },
+  "adopted_result": {
+    "ascendc_full_interface_us": 28541.0,
+    "pto_full_interface_us": 30226.5,
+    "ascendc_xcheck_mean_us": 28587.1,
+    "pto_xcheck_mean_us": 30338.3,
+    "k2_event_ascendc_us": 28427.3,
+    "k2_event_pto_us": 30151.7,
+    "improvement_pct_vs_iter1": {"ascendc": -12.4, "pto": -7.9},
+    "improvement_pct_vs_session_stock_recheck_ascendc": -10.5,
+    "assessment_backend": "ascendc"
+  },
+  "staged_progress": {
+    "var_a_pstash_only_k2_ascendc_us": 29726.6,
+    "var_a_pstash_only_k2_pto_us": 29310.9,
+    "var_full_k2_ascendc_us": 28427.3,
+    "attribution": "P/dP_raw stash + pass-2 G1/G2 elimination: -2779us k2 (stock 32505.5 -> 29726.6); +k3 width 32 & mask/bias vectorization: -1299us k2 further"
+  },
+  "changes_adopted": [
+    "P/dP_raw V-only GM stash (pst_p/pst_dp [grid, NI, head_kv, BN] fp32, name deliberately not 'workspace*' so combinecv cross-core pairing ignores it = zero flag pairs, no statement-count constraint; same-core RAW/WAR auto-synced): pass-1 stashes post-exp P and raw dP; pass-2 reads them and runs only the short dP chain; pass-2 G1/G2 GEMM recompute, mask chain, and ws_s/ws_dp reads deleted; ws_s/ws_dp flag pairs 2->1 each (total 16->14)",
+    "k3 postprocess rows_per_aiv 16->32 (UB 110KB <= 196352B ceiling; bit-identical output, nan-aware micro-check both backends)",
+    "mask/bias apply vectorization in the remaining full P chains (pass-1 always; pass-2 explicit-delta path): fwd iter-3 form, axis=0 broadcast bcast_h [8, BN] + NGRP region ops, bit-exact"
+  ],
+  "changes_blocked": {
+    "ws_dkv_batched_readback_full_576": "UB ceiling: [64,576] fp32 = 147456B staging -> 'Memory allocation failed for dkv_stage required: 147456, new memory available: 0' (usable UB = 196352B = ASCEND_SHARED_MEM_SIZE; pre-iter-2 kernel already at ceiling)",
+    "ws_dkv_batched_readback_3_3": "double-blocked: (a) [32,576] fp32 = 73728B staging (exactly the liveness-disjoint kv_stage slot size) ALSO fails 'available: 0' — the linear-scan memory planner does not recycle the pass-1 gather slot for a pass-2 consumer across the symbolic-extent task loop; (b) the 3-point V-side form needs the 17th cross-core flag pair (hardware limit 16; even with the P-stash freeing 2 pairs the 15-pair layout leaves the staging dead on UB)",
+    "col_limited_2d_ub_dst_note": "T.copy GM->UB with col-limited 2D UB dst IS valid (CI test_tilelang_ascend_language_copy_runtime_extent.py) — the blocker is purely capacity/planner, not the copy form"
+  },
+  "flag_pair_budget": "delta_internal=True: 14 (kv 4 + s 1 + dp 1 + p 2 + dpb 2 + dq 2 + dkv 2); explicit-delta: 12 — both <= 16 hardware limit",
+  "precision": "pass — test_sparse_mla_bwd.py --level all 'Test Passed!' 44 PRECISION_PASS (L0 9/9 + L1 15/15 blocking, dual backend); valrange-m/asym ratio-WARN values identical to iter-1 records (0.9479/0.3011); boundary WARNs bit-identical to stock run (inf_q 0.9997/inf, nan_kv 1.0000/inf, dbound 0.3623/nan); 3 dkv max-abs values within the documented stock atomic-order noise band; variant smoke 24/24 (12 cases x 2 delta paths x 2 backends) vs stock dq sim 1.0000000 / dkv sim 1.0000000; k3 micro-check bit-identical (nan-aware, 5 row counts x 2 backends)",
+  "msprof_after": {
+    "task_duration_us": 28549.2,
+    "aiv": {"mte2_us": 10837.9, "mte2_bw_gbs": 12.21, "mte3_us": 5594.8, "mte3_bw_gbs": 19.25, "vec_us": 989.4, "scalar_us": 2745.4, "flag_waits_us_total": 10677.0},
+    "aic": {"cube_us": 2072.8, "fixpipe_us": 2698.8, "fixpipe_bw_gbs": 72.2, "mte1_us": 1962.0, "mte2_us": 2494.7, "scalar_us": 4848.0, "scalar_mte1_stall_us": 7298.3, "flag_waits_us_total": 20393.5, "wait_kv_stash_ids_us": "id7 10132.8 + id9 9693.9 (V-side kv stash/dummy production)"},
+    "interpretation": "vec 1.79->0.99ms (mask-chain dedup + vectorization); AIC waits 21.4->20.4ms now dominated by waiting for V-side kv stash production (73% idle); AIV waits 13.2->10.7ms; AIV read path bandwidth-saturated: ~147MB/AIV reads (KV 30 + ws_s/dp 13 + pst 13 + ws_dq 30 + ws_dkv readback 60 + idx ~1) at 12.2GB/s ~= 12ms floor — exceeding the 7680us target on volume alone in the current dataflow"
+  },
+  "remaining_vs_goal": "28541 vs 7680us target — 3.72x over. Remaining structure: (1) lockstep flag round-trips (AIC 73% / AIV 38% idle; AUTO stack sealed per fwd iter-4 RC1-RC5 + this iter's planner/flag findings); (2) AIV read volume ~147MB ~= 12ms at saturated bandwidth; (3) per-row scatter serialized issue (3x PIPE_ALL + UB scalar GetValue + 1 atomic per row, 26k rows/AIV) — staging blocked on UB ceiling + flag budget",
+  "design_error_candidate": {
+    "raised": true,
+    "evidence": [
+      "flag-wait share: AIC 20393us/27812 (73%), AIV 10677us/27843 (38%) — per-block serial CV chain under AUTO_CV_SYNC order-based pairing",
+      "attempted bypasses (this iter, all with reproducible signatures): [64,576] fp32 staging (planner 'available: 0'), [32,576] 3:3 staging (planner 'available: 0' + 17th flag), seg-only [64,512] (planner), per-segment C-side split (L0C accumulator reuse), row-half C-side split (vid-asymmetric data readiness breaks order pairing), prior iter routes (3D-of-4D truncation, 640-wide SEGV, gemm_v0 dtype)",
+      "bandwidth floor: AIV reads ~147MB at 12.2GB/s ~= 12ms > 7680us target — the two-pass transit dataflow cannot reach the goal even with zero sync overhead"
+    ],
+    "expert_hybrid_estimate": "manual flags could overlap the AIC 20.4ms idle with V work and manually place the 73KB scatter staging in kv_stage's slot -> plausibly ~19-21ms; reaching 7680us additionally requires dataflow-level transit volume reduction (architecture decision, e.g. single-pass fusion of the P/dP transit with the dkv GEMM inputs, C-side L0C-resident dq cross-block accumulation (L0C-capped), or precision-gated bf16 transits)"
+  },
+  "artifacts": {
+    "variants": "/tmp/opencode/b3i2/{stock,var_a,var_ab,var_full}.py + driver.py + bench_v.py + msprof_iter2/",
+    "backup_before": "history_version/sparse_mla_bwd_perf_iter2.py (= iter-1 adopted state) + perf_tuning/sparse_mla_bwd/sparse_mla_bwd_iter2_before.py",
+    "gate_logs": "in-session (44 PRECISION_PASS, 'Test Passed!'); boundary diff vs stock run identical"
+  }
+}

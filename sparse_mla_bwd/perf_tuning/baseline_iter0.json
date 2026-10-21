@@ -1,0 +1,74 @@
+{
+  "operator": "sparse_mla_bwd",
+  "iteration": 0,
+  "date": "2026-10-14T22:40-23:59",
+  "target_shape": {
+    "B": 1, "S": 2048, "H": 64, "HKV": 1, "DQKV": 576, "DV": 512,
+    "topk": 512, "dtype": "bfloat16", "offsets": [0, 2048]
+  },
+  "goal_us": 7680,
+  "measurement": {
+    "criterion": "tilelang.profiler.do_bench(fn, warmup=250, rep=100) mean, fn = full sparse_mla_bwd interface call (delta=None, bwd+postprocess two launches) — main-repo criterion",
+    "cross_check": "NPU event timing warmup5+30, no L2 flush",
+    "inputs": "make_case_inputs seed=0 (main-repo randperm causal flow); (o,lse) via in-test torch fallback (same-source as golden fwd, deterministic)"
+  },
+  "baseline": {
+    "ascendc_full_interface_us": 79395.3,
+    "pto_full_interface_us": 80004.2,
+    "ascendc_xcheck_mean_us": 80648.1,
+    "pto_xcheck_mean_us": 80213.0,
+    "assessment_backend": "ascendc"
+  },
+  "segment_split_ascendc": {
+    "k2_bwd_kernel_us": 79371.4,
+    "k3_postprocess_us": 810.0,
+    "host_alloc_note": "dQ zero(151MB) 94us, dKV zero(4.5MB) 94us - negligible; k2 dominates 99.5%"
+  },
+  "msprof_k2_baseline_ascendc": {
+    "task_duration_us": 78944.4,
+    "block_dim": 20, "mix_block_dim": 40,
+    "aic_per_core": {
+      "cube_time_us": 2659, "mte1_us": 2652, "mte2_us": 2468,
+      "fixpipe_us": 2998, "scalar_us": 5491,
+      "wait_id8_us": 28402, "wait_id10_us": 37899,
+      "interpretation": "AIC ~86% waiting on V-side ws_kv gather flags (id8 pass-1, id10 pass-2); cube pure compute 3.4%"
+    },
+    "aiv_per_core": {
+      "vec_us": 1792, "mte2_us": 21237, "mte2_active_bw_gbs": 7.56,
+      "mte3_us": 39799, "mte3_active_bw_gbs": 3.09,
+      "scalar_us": 5436,
+      "interpretation": "AIV is the sole critical path; MTE3 fragmented micro-writes (gather 256B segs x2 passes + 2304B fp32 atomics) at 3.1GB/s + MTE2 row reads at 7.6GB/s"
+    }
+  },
+  "v_side_traffic_model_per_aiv": {
+    "mte3_mb": {"pass1_gather_writes": 30, "pass2_gather_writes": 30, "dkv_atomics": 60, "ws_p_dpb": 3.3, "dQ": 3.7},
+    "mte2_mb": {"kv_row_reads_both_passes": 60, "ws_s_dp_reads": 26, "ws_dq_reads": 29, "ws_dkv_readback": 60}
+  },
+  "candidate_a_result": {
+    "change": "ws_kv per-block stash [grid, NI+1, BN, DDT]; pass-2 V-side gather deleted when delta_internal (C re-reads stashed slot via bulk MTE2); 2 CV-pairing dummy writes to scratch slot NI; explicit-delta single-pass path keeps its (slot-indexed) gather",
+    "fix_during_bringup": "first full-gate run failed L0-4 (explicit-delta leg) on both backends — the initial edit deleted the pass-2 gather unconditionally, but delta_internal=False has NO pass 1 (single-pass structure) so its only gather was gone (variant smoke only covered delta_internal=True; lesson recorded). Fixed by keeping the slot-indexed per-row gather on the else-branch; L0-4 then PASSes with Stage-2-identical numbers (dq sim 0.999996 / ratio 0.9983)",
+    "k2_ascendc_us": 55691.3,
+    "full_interface_ascendc_us": 56363.8,
+    "full_interface_pto_us": 57210.7,
+    "improvement_pct_vs_baseline": -29.1,
+    "precision": "pass — test_sparse_mla_bwd.py --level all 'Test Passed!' (L0 9/9 + L1 15/15, kernel fwd mode, dual backend) + coverage gate 24 PASS / 0 MISS / 0 N/A; valrange-m/asym ratio-WARN values identical to Stage-2 records (0.9479/0.3011, non-blocking)",
+    "correctness_evidence": "dQ bit-identical vs stock on all delta_internal smoke cases (S=128/256/645/2048, natural/oob/neg1/repeat, NI=1/4); dkv within stock's own atomic-order nondeterminism band (stock run-to-run: 238/1.18M elems differ, max 1 bf16 ulp; S=645 residual diffs are near-zero cancellation residues ~2e-7)",
+    "msprof_after": {
+      "task_duration_us": 56356.6,
+      "aiv": {"mte3_us": 22580, "mte3_bw_gbs": 4.0, "mte2_us": 17363, "mte2_bw_gbs": 8.0, "vec_us": 1775, "scalar_us": 4265},
+      "aic": {"cube_us": 2644, "wait_id8_us": 28570, "wait_id10_us": 15555}
+    },
+    "remaining_vs_goal": "56364 vs 7680us target — 7.34x over; identified next targets: dkv atomic scatter path (~120MB/AIV V-side traffic incl. ws_dkv readback), pass-1 gather micro-writes (~30MB), P-chain row ops, k3 (810us)"
+  },
+  "candidate_b_blocked": {
+    "two_batch_3:3": "fwd-validated staged-gather form needs 17 sync pairs -> cross-core flag id 16 overflows the 16-id hardware limit; id16 aliases flag 0 (ws_dkv, set every block) -> paired wait releases immediately -> stale ws_s reads in pass 2 (dQ 28% / dkv 99% corruption at NI=4; NI=1 masked because stale values coincide)",
+    "single_batch_2:2": "[HALF,DDT] whole-2D write (keeps 16 pairs) crashes the host compiler in OptimizeForTarget (SEGV, ascend_combinecv 'Vec loop times (= 1) not enough to catch up cube loop times (= 4)' family); NI=1 build runs but kernel SEGVs at launch",
+    "workaround_for_iter1": "free 2 flag ids by merging ws_p / ws_dpb hi+lo channel pairs into single 3D statements (17-2=15 pairs), then re-try the fwd 3:3 form"
+  },
+  "artifacts": {
+    "variants": "/tmp/opencode/b3i0/{var_stash.py,driver_stash.py,det_check.py,breakdown.py,bench_bwd.py,msprof_driver_A.py}",
+    "generated_sources": "/tmp/opencode/b3i0/kernel_src_{A,B,balt,fwd}.cpp",
+    "msprof": "/tmp/opencode/b3i0/msprof_k2/ and msprof_A/",
+    "backup": "history_version/sparse_mla_bwd_perf_iter0.py"
+  }
+}

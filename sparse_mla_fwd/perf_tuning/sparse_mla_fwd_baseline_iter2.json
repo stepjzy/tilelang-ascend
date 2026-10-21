@@ -1,0 +1,36 @@
+{
+  "operator": "sparse_mla_fwd",
+  "iteration": 2,
+  "date": "2026-10-14",
+  "test_shape": "B=1 S=4096 H=128 HKV=1 DQK=576 DV=512 topk=1024 bf16 (DESIGN 9.4 sentinel)",
+  "methodology": "pure kernel, torch.npu events, 20 iters after 5 warmup, NPU idle serial",
+  "baseline": {
+    "ascendc_pure_kernel_us": 81700, "ascendc_std": 270,
+    "ascendc_min_us": 81328, "ascendc_max_us": 82126,
+    "pto_pure_kernel_us": 78565, "pto_std": 308,
+    "pto_min_us": 78140, "pto_max_us": 79176,
+    "ascendc_interface_us": 81952, "pto_interface_us": 78949,
+    "source": "perf_tuning/sparse_mla_fwd_perf_log.md Iteration 2 (--level perf)"
+  },
+  "previous_baseline": {
+    "ascendc_pure_kernel_us": 138551, "pto_pure_kernel_us": 133774,
+    "improvement_pct": {"ascendc": -41.1, "pto": -41.3}
+  },
+  "target_us": 24288,
+  "programming_mode": "Developer (4-True AUTO pass_configs, F6b layout + iter-2 gather staging)",
+  "optimization": "P0 gather batch staging: kv_stage [32,576] bf16 two-batch whole-2D MTE3 writes (320 fragment writes -> 2 large + 1 idempotent mini rewrite), AUTO_CV_SYNC pairing 2:2 -> 3:3 (C-side dummy read + V-side trailing rewrite)",
+  "probe_findings": {
+    "ascendc_2d_colslice_source": "BROKEN (probe1b/1c; pto OK)",
+    "safe_forms": "whole-2D source, 1D row-slice source, 2D row-dest staging, whole-2D GM->UB col-range dest",
+    "modulo_region_indexing": "BROKEN (probe2 row1d)",
+    "bandwidth_per_block_per_aiv_us": {"frag": 61.14, "batch32": 17.11}
+  },
+  "ub_budget": {
+    "kv_stage_bytes": 36864, "kv_stage_offset": 135168,
+    "aliased_with": "acc_s_ub(135168)+cast_bf16(172288) via MEMORY_PLANNING liveness",
+    "peak_bytes": 188928, "limit_bytes": 196352
+  },
+  "precision_state": "pass (L0 4/4 + L1 48/0 incl repeat/neg_oob/short_segments + L2 4/4 + Boundary 16 pass 2 warn[baseline-identical], dual backend)",
+  "adopted": true,
+  "backup_path": "history_version/sparse_mla_fwd_perf_iter2.py"
+}

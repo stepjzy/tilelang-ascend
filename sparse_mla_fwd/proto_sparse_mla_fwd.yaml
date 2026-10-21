@@ -1,0 +1,77 @@
+# proto_sparse_mla_fwd — sparse_mla_fwd 算子接口规格
+# 说明：本目录（examples_experiment/dsa_sparse_finetune/）多算子共存，接口规格独立命名
+# （先例：proto_indexer_bwd.yaml / proto_indexer_topk_reducesum.yaml）；
+# 覆盖门禁 coverage_check.py --proto 请指向本文件。
+# dtype 全集与 DESIGN_sparse_mla_fwd.md §9.3 精度表一致（本算子为固定 dtype 组合，无 dtype 扫描维度）；
+# attr 取 DESIGN §1/§4/§5.2 机械派生。
+operator:
+  name: sparse_mla_fwd
+  category: Fusion  # CV 混合：gemm_v0 QK/PV (Cube) + mask/online-softmax/rescale (Vector) + 随机行 gather (MTE)
+  formula: |
+    DSA 稀疏 MLA 前向（varlen packed）。对每个 packed 行 s_row（batch b、行内位置 s_i）、每个 kv_group g：
+    按 Indices[s_row, g, j] (j∈[0,topk)) gather KV 行，计算
+    score[h,j] = (Q[s_row,h,:512]·KV_main[idx,:512] + Q[s_row,h,512:576]·KV[idx,512:576]) * sm_scale
+    mask[j] = (idx <= s_i) & (idx != -1)   # causal + 无效槽（重复索引不去重，重复计贡献——主仓 kernel 语义）
+    在线 softmax（m_i/sumexp/alpha 流式更新），O = P @ V（V = KV[idx,:512]）
+    Lse[s_row,h] = log(sumexp) + m_i；sm_scale 缺省 = (dim+tail_dim)^-0.5
+  attrs:
+    - name: heads
+      type: Int
+      default: None      # 缺省取 q.shape[1]；约束 heads % kv_group == 0 且 head_kv=heads//kv_group
+                         # 满足 (16<=head_kv<=64 且 2 的幂) 或 (head_kv % 64 == 0)（主仓 assert 原样）
+      required: false
+    - name: dim
+      type: Int
+      default: None      # 缺省取 d_v=512（主仓 interface 缺省）；约束 2 的幂（主仓 assert）
+      required: false
+    - name: tail_dim
+      type: Int
+      default: None      # 缺省取 q.shape[2]-dim；约束 2 的幂（主仓 assert）
+      required: false
+    - name: topk
+      type: Int
+      default: None      # 缺省取 indices.shape[-1]；约束 topk % block_I == 0（主仓 assert）
+      required: false
+    - name: kv_group
+      type: Int
+      default: None      # 缺省取 kv.shape[1]；约束整除 heads
+      required: false
+    - name: sm_scale
+      type: Float
+      default: None      # 缺省 (dim+tail_dim) ** -0.5（主仓语义）
+      required: false
+    - name: block_I
+      type: Int
+      default: 128       # portable 路径 topk 分块 BI（支持域 {64, 128}，DESIGN §5.2 rev1 档）；
+                          # fast v2 的 BI=256 为结构常量，gate 判定 (topk,H,G,dim,tail) 时忽略用户值
+      required: false
+    - name: target
+      type: Enum         # ["ascendc", "pto"]（DESIGN §9.6 双后端硬性要求；portable 双后端，
+                          # fast v2 仅 ascendc）。dispatch 分派树（DESIGN §11.4 rev2b）：
+                          # ascendc ∧ H=128/G=1/(dim,tail)=(512,64)/topk%256==0/NI∈[1,6] → fast v2；
+                          # 域外/pto → portable；fast v1 退役保留；无 fp16 环节无值域谓词
+      default: ascendc
+      required: false
+  inputs:
+    - name: q                  # Q [ΣS, heads, dim+tail_dim]
+      dtype: [bfloat16]
+    - name: kv                 # KV [ΣS_kv, kv_group, dim+tail_dim]（同一 KV 空间 varlen 各段引用）
+      dtype: [bfloat16]
+    - name: indices            # Indices [ΣS, kv_group, topk]，值域 {-1} ∪ 任意 int32（越界 clamp + mask 置 0），任意分布
+      dtype: [int32]
+    - name: offsets            # Offsets [batch+1] cu_seqlens（varlen）
+      dtype: [int32]
+    - name: token_indices      # host 预构建派生输入（prepare_token_indices，CPU 构造 + H2D）[ΣS, 2] = (batch_id, 行内位置)
+      dtype: [int32]
+  outputs:
+    - name: output             # Output [ΣS, heads, dim]
+      dtype: [bfloat16]
+    - name: lse                # Lse [ΣS, heads]（logsumexp，fp32）
+      dtype: [float32]
+  schema: >-
+    sparse_mla_fwd(q: Tensor[ΣS, H, dim+tail_dim] bf16, kv: Tensor[ΣS_kv, G, dim+tail_dim] bf16,
+    indices: Tensor[ΣS, G, topk] int32, offsets: Tensor[B+1] int32,
+    heads: int = None, dim: int = None, tail_dim: int = None, topk: int = None,
+    kv_group: int = None, sm_scale: float = None, block_I: int = 128,
+    target: str = "ascendc") -> (output: Tensor[ΣS, H, dim] bf16,
+    lse: Tensor[ΣS, H] fp32)
