@@ -27,7 +27,7 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-fwd-pr（origin，已 push）
-- **PR 尚未创建** → PR_DESCRIPTION.md 已按模板起草初稿（真实实测数据，提交 PR 时可直接使用）
+- **PR 尚未创建** → PR_DESCRIPTION.md（PR 正文，提交时直接使用）
 
 ## 遗留疑问 / 未走通的路
 - 46667us 干净基线之后的优化空间（evidence_audit 的推导结论）
