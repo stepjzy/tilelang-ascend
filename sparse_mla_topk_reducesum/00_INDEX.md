@@ -18,7 +18,7 @@
 5. `history_version/`（20min）→ **交付基线 = `sparse_mla_impl_pre_p3.py`**
    （P2 版本，825 行）；终态 `sparse_mla_topk_reducesum.py` 是 Gather+GEMM
    证伪实验的存档（1622 行），**不要当作交付版本学习**
-6. `PR_DESCRIPTION_live_1884.md` → 线上 PR 正文：Expert 模式
+6. `PR_DESCRIPTION.md（#1884 线上正文）` → 线上 PR 正文：Expert 模式
    （T.alloc_L1/L0C/ub 层级、T.Scope("C") AIC + T.Scope("V") 2×AIV 双流、
    set/wait_cross_flag mode-2 quorum、persistent 1-D grid=20）
 
@@ -30,7 +30,7 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-topk-reducesum-pr（origin）
-- **PR #1884 open**（线上正文已存 PR_DESCRIPTION_live_1884.md；
+- **PR #1884 open**（线上正文已存 PR_DESCRIPTION.md（#1884 线上正文）；
   本地稿 PR_DESCRIPTION_draft.md / official_template.md 留档对照）
 - 注意：-pr 分支最终版与沙箱版有差异（Ruff 格式化 + 提交前清理），
   对照学习时以 -pr 分支为交付真源

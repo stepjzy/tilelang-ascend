@@ -26,7 +26,7 @@ PTO / AscendC 双后端下各自独立的调优方法论。
 
 ## 交付物
 - 分支 feat/indexer-topk-reducesum-pr（origin，已 push）
-- **PR 尚未创建** → PR_DESCRIPTION.md 为占位待补
+- **PR 尚未创建** → PR_DESCRIPTION.md 已按模板起草初稿（真实实测数据，提交 PR 时可直接使用）
 
 ## 遗留疑问 / 未走通的路
 - generic 路径性能未优化（是否有必要？）

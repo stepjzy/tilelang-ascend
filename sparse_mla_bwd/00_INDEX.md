@@ -26,7 +26,7 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-bwd-pr（origin，已 push）
-- **PR 尚未创建** → PR_DESCRIPTION.md 为占位待补
+- **PR 尚未创建** → PR_DESCRIPTION.md 已按模板起草初稿（真实实测数据，提交 PR 时可直接使用）
 
 ## 遗留疑问 / 未走通的路
 - Δ-from-bf16-o 接口颗粒问题的最终口径（校准层修订后的门禁定义）
