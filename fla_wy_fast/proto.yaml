@@ -1,0 +1,100 @@
+# proto.yaml — fla_wy_fast 算子接口规格（KDA chunked WY 表示，fwd + bwd 双 kernel）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_wy_fast.py              Triton/FLA 参考实现（语义权威 + 测试样例对齐）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_wy_fast.py
+#   - ref_gpu/fla_wy_fast_tilelang_fwd.py 上游 TileLang CUDA 前向（代码级迁移起点）
+#     ← tile-ai/tilelang@main examples/kda/wy_fast.py
+#   - ref_gpu/fla_wy_fast_tilelang_bwd.py 上游 TileLang CUDA 反向（代码级迁移起点）
+#     ← tile-ai/tilelang@main examples/kda/wy_fast_bwd.py
+#   - ref_gpu/test_utils_kda.py           上游 do_bench 计时口径（warmup=20, rep=10, mean）
+# 范围：定长序列、use_qg=False、use_kg=True（对齐上游 benchmark main()）；
+#   varlen / use_qg 分支不在本次范围。
+# 编程模式：Developer（用户指定，2026-10-21）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/precision-standard.md
+#   混合容差，golden = PyTorch 参考实现）：
+#   - fwd（bf16 输出 W/U/KG）：atol 2^-10, rtol 2^-6, max_abs_error_limit 1e0, ratio ≥ 0.99
+#   - bwd（fp32 输出 dA/dk2/dv/dbeta/dg2）：atol 2^-16, rtol 2^-10, max_abs_error_limit 1e-2, ratio ≥ 0.99
+# 性能目标：纯 Kernel 时间 fwd + bwd 合计 < 1370 us；
+#   口径 = 主仓原 GPU 测试样例（对齐 ref_gpu/test_utils_kda.py do_bench：
+#   预热 20 次后重复 10 次取平均，仅设备侧 kernel 执行时间，不含张量构造/
+#   H2D-D2H/JIT/框架开销）：
+#   - fwd benchmark：B=1, S=8192, H=64, DK=128, DV=128, chunk=64，
+#     输入输出 bf16（gate gk 与累加 fp32），输出 W/U/KG
+#   - bwd benchmark：B=1, S=32768, H=8, DK=128, DV=128, chunk=64，
+#     全 fp32（input/output/accum/gate），输出 dA/dk2/dv/dbeta/dg2
+operator:
+  name: fla_wy_fast
+  category: Fusion  # C/V 混合：GEMM (Cube) + exp2/逐元素乘/rowsum (Vector)
+  formula: |
+    记 chunk 长度 BT=64（S 可整除），A_c = A[b, t:t+BT, h, :] 为该 chunk 的
+    BT×BT 矩阵（上游 chunk_delta 已算好的 (I - tril(diag(β)·A_raw, -1))^{-1}，
+    本算子只消费不生产）；g = gk 为逐 token 累积 log2 衰减；n 为 chunk 内末行；
+    strict_tril(M) = 仅保留下三角（i > j），对角与上三角置 0；⊙ 为逐元素乘。
+    fwd (recompute_w_u_fwd，逐 chunk 逐 head)：
+      u[t:t+BT, h]  = A_c @ (β ⊙ v)                    # [BT, DV]
+      w[t:t+BT, h]  = A_c @ (β ⊙ k ⊙ 2^g)              # [BT, DK]
+      kg[t:t+BT, h] = k ⊙ 2^(g[n, :] - g)              # [BT, DK]，use_kg=True
+    bwd (prepare_wy_repr_bwd，记 K_bg = β⊙k⊙2^g, V_b = β⊙v,
+         S = strict_tril(dw @ K_bg^T + du @ V_b^T))：
+      dA    = -strict_tril(A_c^T @ S @ A_c^T)          # [BT, BT]
+      dk2   = (A_c^T @ dw) ⊙ β ⊙ 2^g + dk              # [BT, DK]（dk 为入参部分梯度）
+      dv    = (A_c^T @ du) ⊙ β                          # [BT, DV]
+      dbeta = rowsum((A_c^T@dw) ⊙ k ⊙ 2^g) + rowsum((A_c^T@du) ⊙ v)   # [BT]
+      dg2   = K_bg ⊙ (A_c^T @ dw) + dg                  # [BT, DK]（dg 为入参部分梯度）
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: use_qg
+      type: Bool
+      default: false   # 上游 benchmark 配置；本次迁移不实现该分支
+      required: false
+    - name: use_kg
+      type: Bool
+      default: true    # fwd 需输出 kg
+      required: false
+  inputs:
+    - name: k     # [B, S, H, DK]
+      dtype: [bfloat16, float32]   # fwd bf16 / bwd fp32（benchmark 口径）
+    - name: v     # [B, S, H, DV]
+      dtype: [bfloat16, float32]
+    - name: beta  # [B, S, H]
+      dtype: [bfloat16, float32]
+    - name: gk    # [B, S, H, DK] 逐 token 累积 log2 衰减
+      dtype: [float32]
+    - name: A     # [B, S, H, chunk_size] chunk 内 (I-tril(βA,-1))^{-1}
+      dtype: [bfloat16, float32]
+    - name: dw    # [B, S, H, DK] 上游梯度（仅 bwd）
+      dtype: [float32]
+    - name: du    # [B, S, H, DV] 上游梯度（仅 bwd）
+      dtype: [float32]
+    - name: dk    # [B, S, H, DK] 入参部分梯度，累加入 dk2（仅 bwd）
+      dtype: [float32]
+    - name: dg    # [B, S, H, DK] 入参部分梯度，累加入 dg2（仅 bwd）
+      dtype: [float32]
+  outputs:
+    - name: w     # [B, S, H, DK]（fwd）
+      dtype: [bfloat16]
+    - name: u     # [B, S, H, DV]（fwd）
+      dtype: [bfloat16]
+    - name: kg    # [B, S, H, DK]（fwd, use_kg=True）
+      dtype: [bfloat16]
+    - name: dA    # [B, S, H, chunk_size]（bwd）
+      dtype: [float32]
+    - name: dk2   # [B, S, H, DK]（bwd）
+      dtype: [float32]
+    - name: dv    # [B, S, H, DV]（bwd）
+      dtype: [float32]
+    - name: dbeta # [B, S, H]（bwd）
+      dtype: [float32]
+    - name: dg2   # [B, S, H, DK]（bwd）
+      dtype: [float32]
+  schema: >-
+    fla_wy_fast_fwd(k: Tensor[B,S,H,DK], v: Tensor[B,S,H,DV], beta: Tensor[B,S,H],
+    gk: Tensor[B,S,H,DK] fp32, A: Tensor[B,S,H,64], chunk_size: int = 64,
+    use_kg: bool = True) -> (w: Tensor[B,S,H,DK] bf16, u: Tensor[B,S,H,DV] bf16,
+    kg: Tensor[B,S,H,DK] bf16);
+    fla_wy_fast_bwd(k, v, beta, gk, A, dw, du, dk, dg: 全 Tensor 且 bwd 域 fp32,
+    chunk_size: int = 64) -> (dA: Tensor[B,S,H,64], dk2: Tensor[B,S,H,DK],
+    dv: Tensor[B,S,H,DV], dbeta: Tensor[B,S,H], dg2: Tensor[B,S,H,DK] 全 fp32)

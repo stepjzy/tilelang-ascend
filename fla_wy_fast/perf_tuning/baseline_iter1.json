@@ -1,0 +1,26 @@
+{
+  "operator": "fla_wy_fast",
+  "iteration": 1,
+  "date": "2026-10-22",
+  "device": "Ascend 910B3 (64GB, 20 AI Cores)",
+  "toolchain": "CANN 9.2.0, tilelang 0.1.4+1d752539 (ascendc_pto baseline)",
+  "programming_mode": "Developer (alloc_shared/fragment + AUTO_CV_COMBINE/SYNC), threads=1",
+  "baseline_fwd": {
+    "shape": "B=1, S=8192, H=64, DK=128, DV=128, chunk=64 (bf16 + fp32 gate)",
+    "time_ms": 8.8,
+    "source": "perf_tuning/fla_wy_fast_baseline.md (2026-10-21 measured, re-verified this iteration)"
+  },
+  "baseline_bwd": {
+    "shape": "B=1, S=32768, H=8, DK=128, DV=128, chunk=64 (all fp32)",
+    "time_ms": 14.3,
+    "source": "perf_tuning/fla_wy_fast_baseline.md (2026-10-21 measured, re-verified this iteration)"
+  },
+  "baseline_total_ms": 23.1,
+  "theoretical_floor_ms": 6.34,
+  "ratio_to_floor": 3.65,
+  "timing_protocol": "NPU event timing, warmup=20, rep=10, mean, device-side only (upstream do_bench equivalent); bench_fla_wy_fast.py",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_wy_fast.py --level all",
+  "precision_status": "pass (Stage 2 exit: L0/L1 all PRECISION_PASS, L2 correct-reject, boundary 5/6 PASS + 1 expected WARN)",
+  "noise_threshold_pct": 3.0,
+  "note": "Baseline doc claims fwd/bwd effective bandwidth 350-400GB/s ~= HBM saturation; this counts ALL moved bytes incl. C/V-combine GM workspace relays. Hypothesis to verify: workspace relays hit L2, real HBM utilization much lower, bottleneck is vector-side serialization (64-row serial tile loops) / MTE issue rate / L2 bandwidth."
+}
