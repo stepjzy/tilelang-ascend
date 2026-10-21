@@ -26,7 +26,7 @@
    机器态波动（Δ18%）显式记录而非忽略
 
 ## 交付物
-- 分支 feat/sparse-mla-fwd（origin，已 push）
+- 分支 feat/sparse-mla-fwd-pr（origin，已 push）
 - **PR 尚未创建** → PR_DESCRIPTION.md 为占位待补
 
 ## 遗留疑问 / 未走通的路
