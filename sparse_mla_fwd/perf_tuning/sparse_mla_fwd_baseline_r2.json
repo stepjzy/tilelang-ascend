@@ -1,0 +1,73 @@
+{
+  "round": 2,
+  "date": "2026-10-22",
+  "operator": "sparse_mla_fwd",
+  "baseline_kernel_md5": "2aed46c17ad300f772ecf9358b966648",
+  "baseline_backup": "history_version/sparse_mla_fwd_perf_r2_base.py",
+  "measurement_protocol": {
+    "timing": "pure kernel, NPU events, warmup2+20 per round, 3 interleaved rounds + v0 bracket, median of round means, single process, frozen main inputs /tmp/opencode/t3i4/l0_main_inputs.pt",
+    "same_session_rule": "all variants vs v0 interleaved in ONE process (iter-6 lesson: cross-session absolute numbers not comparable)",
+    "noise_threshold_pct": 3.0
+  },
+  "machine_state_windows": {
+    "note": "documented bimodal drift (audit s3.0): fast ~46.5ms / slow ~57ms windows within the same day; load avg 5.8-6.2 during slow window",
+    "fast_window_v0_us": {"rounds": [46451, 46514, 46554, 46580], "median": 46554},
+    "slow_window_v0_us": {"rounds": [56792, 56920, 56948, 56965], "median": 56948}
+  },
+  "ab_results_fast_window": {
+    "v0": {"median_us": 46554},
+    "a1a": {"median_us": 55743, "delta_pct": 19.7, "verdict": "REJECT (regression)"},
+    "a1b": {"median_us": 46319, "delta_pct": -0.5, "verdict": "REJECT (< 3% threshold)"},
+    "a3a": {"median_us": 45359, "delta_pct": -2.6, "verdict": "see final combined run"},
+    "combo_a1a_a1b_a3a": {"median_us": 54773, "delta_pct": 17.7, "verdict": "REJECT (inherits a1a regression)"}
+  },
+  "ab_results_slow_window": {
+    "v0": {"median_us": 56948},
+    "c23_a1b_a3a": {"median_us": 56203, "delta_pct": -1.3, "verdict": "see final combined run"}
+  },
+  "final_combined_run_slow_window": {
+    "v0": {"rounds": [56943, 56873, 57186, 57154], "median_us": 57154},
+    "a3a": {"rounds": [56441, 56547, 56473], "median_us": 56473, "delta_pct": -1.2},
+    "c23_a1b_a3a": {"rounds": [56290, 56196, 56280], "median_us": 56280, "delta_pct": -1.5},
+    "verdict": "all three candidates REJECTED (none clears the 3% adoption threshold in any window; a1a is a +19.7% regression)"
+  },
+  "final_state": {
+    "kernel_changed": false,
+    "kernel_md5_after_round": "2aed46c17ad300f772ecf9358b966648",
+    "level_all_same_day": {"precision_pass": 56, "precision_fail": 0, "boundary_pass": 16, "boundary_warn": 6, "boundary_fail": 0, "result": "Test Passed (identical to baseline WARN profile, zero deterioration)"},
+    "level_perf_same_day": {
+      "ascendc_interface_do_bench_us": 49589,
+      "ascendc_interface_std_us": 276,
+      "ascendc_pure_kernel_note": "test _perf_pure_kernel times the PORTABLE kernel (67714 us); the fast v2 pure-kernel numbers are the ab_r2 interleaved values above",
+      "pto_interface_us": 75699
+    },
+    "consecutive_no_improvement": 1
+  },
+  "precision_oracle": {
+    "a1a": {
+      "main_vs_v0": {"bitexact": false, "ndiff": 57, "numel": 268435456, "matched_ratio": 1.0, "max_abs": 4.883e-04},
+      "stress": "finite positions bit-identical (max_abs=0), diffs confined to non-finite corner rows",
+      "vs_portable": {"matched_ratio_out": 1.0, "max_abs_out": 3.906e-03, "matched_ratio_lse": 1.0, "max_abs_lse": 9.537e-07}
+    },
+    "a1b": {
+      "main_vs_v0": {"bitexact": false, "ndiff": 69796640, "matched_ratio": 1.0, "max_abs": 3.125e-02},
+      "vs_portable": {"matched_ratio_out": 1.0, "max_abs_out": 3.125e-02, "lse_unaffected": true, "max_abs_lse": 9.537e-07},
+      "note": "max_abs 3.125e-02 == iter-4 predicted transit-grain rounding; all gates pass"
+    },
+    "a3a": {
+      "main_vs_v0": {"bitexact": true, "ndiff": 0, "numel": 268435456},
+      "stress_ni4_ni1": "bit-exact (pure scheduling change)"
+    }
+  },
+  "hardware_findings": {
+    "R-CAST-BF16FP16": "dav_c220 VCast has NO bf16->fp16 overload (CastIntrinsicsImpl no-match, probe_casts.py); workaround used: host precast of KV + 3-step P emulation fp32->bf16->fp32->fp16 (probe_casts2.py P2b bit-exact)",
+    "R-FP32FP16-ROUNDING": "direct fp32->fp16 VCast differs from torch round-nearest-even (probe P2a FAIL) — must not be used where bit-exactness matters",
+    "R-FP16-NOBW": "fp16 transfers are NOT faster than bf16 at equal byte count (both 2B/elem): a1a same-byte regime measured C mte2 39.5ms vs 31.0ms (+27%), V mte3 +28%, V mte2 +16% — fp16 paths are structurally SLOWER on dav_c220",
+    "AUDIT_ERR_A1A": "evidence-audit s4.1 A1a row claims ws_kv fp16 halves its GM traffic (4.83->2.42GB x3 items = -7.28GB): ARITHMETIC ERROR — fp16 and bf16 are both 2 bytes; the audit itself notes ws_p traffic is unchanged under fp16. The -7.24/-7.28GB saving is phantom; C1/C2 combination projections (23.42GB, 26-34ms) inherit the error"
+  },
+  "flag_budget_check": {
+    "a3a_LEAD2_NI4": "F0 ids {0,1,2} + F1A {3..6} + F2 {7..10} + F3 {11,12} = 13 ids <= 16 OK",
+    "a3a_NI1_LEAD1": "F0 {0,1} + F1A {2} + F2 {3} + F3 {4,5} = 6 ids OK",
+    "gate_change": "NI<=6 -> NI<=5 (2NI+5<=16 for LEAD=2); no test config uses NI=6"
+  }
+}

@@ -630,3 +630,155 @@ V 侧 34.2us 中 ~11-12us（ws_o 读回 ~6.0 + ws_kv bulk 写等）同源、10.8
 next_hint: Orchestrator 裁决回 Stage 1 rev2：以 **(a)+(c) 为流量主轴 + (b) 固定项摊销 + (d) 结构参考** 重设计
 数据通路（L0C 驻留 acc_o + fp16 UB→L1 直连 + 大块/L1 ring）；本实现（fast 52.3ms 同会话 / 便携 64-70ms）冻结为
 实现层最优参考基线，rev2 后作对照。
+
+---
+
+## Round 2 — 2026-10-22（交付后续优 · 稳健优化包 A1a/A1b/A3a：A1a 流量前提证伪，三项全否决，零采纳）
+
+- bottleneck_type: other（本轮主交付 = 证据链修正：审查 §4.1 A1a 行流量模型存在**算术错误**——fp16 与 bf16 同为 2 字节，ws_kv fp16 化不省任何字节；实测 fp16 通路在同字节量下反而更慢）
+- optimization: 证据审查 §4.3③ 优先级 ①+③（C2 工程稳健组合）三项独立 A/B + 叠加，全部同进程交错轮测
+  （3 轮 × warmup2+20 取中位 + v0 括号锚，冻结主仓输入）：**A1a** ws_kv fp16 路由（重构为 Q/KV host 预转 +
+  P 三步位保持仿真，见 §1）**+19.7% 否决**；**A1b** ws_o bf16 中转 **-0.5% 否决**（<3% 阈）；**A3a** LEAD=2
+  前瞻加深（bit-exact ndiff=0）快态 **-2.6%** / 慢态 **-1.2%**，均 <3% 阈**否决**；**c23**（A1b+A3a 叠加）慢态
+  **-1.5% 否决**；combo（含 A1a）+17.7% 继承劣化。**零采纳，主文件零改动**（md5 2aed46c1 与冻结基线一致）
+- baseline_time: **46554 us 快态窗口**（4 轮 46451-46580，与审查 §3.0 的 46667 同量级 ✓）/ 56948-57154 us
+  慢态窗口（同日双峰 ±18% 再现，load avg 5.8-6.2 时段；跨窗口绝对值不可比再次实证）
+- candidate_time: a1a 55743±460（快态）；a1b 46319±362（快态）；a3a 45359±238（快态）/ 56473±308（慢态）；
+  c23 56203-56280（慢态两跑）；combo 54773±240（快态）
+- improvement: **0%（无采纳）**
+- precision: pass（主文件零改动；候选精度全量记录见 §4——a3a 全 bit-exact，a1a 1-ULP 级 57/268M，
+  a1b out max_abs 3.125e-02 与 iter-4 预测逐位一致且 Lse 不受影响，§9.3 双门禁全过）
+- adopted: **no（三项全否）**
+- rollback_reason: a1a 性能劣化 +19.7%（根因链见 §3）；a1b -0.5% / a3a -2.6%（快态最优）均低于 3% 噪声阈
+  ——按采纳规则「性能无变化（<3%）→ 回滚」执行；c23 叠加 -1.5% 同样不过阈
+- consecutive_no_improvement: 1（R2 计）
+- vs 24288 us 预算: OVER 91.7%（46554 快态口径），剩余 1.92×——本轮证伪后，单 kernel 体制下已无 >3% 的
+  已知合法杠杆（§6 修正展望）
+
+### 1. 前置探针与硬件新规则（/tmp/opencode/r2/probe_casts{,2}.py）
+
+任务书 A1a 原案为「V 侧 gather 读 KV bf16 → UB staging 逐组 cast bf16→fp16 → fp16 写 ws_kv」。
+**探针证伪第一步即被硬件封死**：
+
+| # | 规则 | 证据 |
+|---|------|------|
+| **R-CAST-BF16FP16** | dav_c220 VCast **无 bf16→fp16 重载**（`CastIntrinsicsImpl` no-matching-function，候选表落到 int4b_t） | probe_casts.py 编译失败日志（CastIntrinsicsImpl `__ubuf__ half*` ← int4b_t*） |
+| **R-FP32FP16-ROUNDING** | 直连 fp32→fp16 VCast 舍入与 torch RNE **不一致**（bit-exact FAIL）——凡位保持场景禁用 | probe_casts2.py P2a |
+| P2b 三步链 | fp32→bf16→fp32→fp16 位保持仿真 **bit-exact ✓**（bf16 值在 fp16 中精确，两步转换均无损） | probe_casts2.py P2b |
+| P3/P5 | bf16[64,256]→fp32 UB cast ✓；L0C fp32→GM bf16 cast 直连 ✓（iter-4 形态复证） | probe_casts2.py P3/P4+P5 |
+| P6 | fp16 GM→UB→GM 全同型 gather staging ✓ | probe_casts2.py P6 |
+
+**A1a 实施形态据此重构**（相对任务书的两处偏差，均有探针依据）：
+1. **KV host 预转**替代 V 侧 cast（与 Q 同法：`kv.to(torch.float16)` 4.7MB 一次性 + 按 tensor identity 缓存；
+   gather 直读 fp16 副本 dtype-uniform，V 侧零新增 cast/零新增 flag 对）——比任务书的 UB cast 方案更简，
+   流量完全相同（gather 读 KV 副本 4.83GB 不变，fp16=bf16=2B）。
+2. **P 存储位保持**：fp32→bf16（cast_g）→fp32（cg32）→fp16（cg16）三步链把基线的 bf16 P 位型原样带进 fp16
+   ws_p（gemm 无混合 dtype 故 P 必须随 V 转 fp16）；UB 追加 cg32 8KB + cg16 4KB（尾部追加，既有偏移不动，
+   R-UB-LAYOUT 纪律），p-store flag 对数不变。
+
+### 2. A/B 结果表（同进程交错，/tmp/opencode/r2/ab_r2.py，logs/ab_r2.log / ab_c23.log / ab_final.log）
+
+| 候选 | 快态窗口 us（vs v0=46554） | 慢态窗口 us（vs v0=56948/57154） | 判定 |
+|------|---------------------------|----------------------------------|------|
+| A1a fp16 路由 | 55743±460（**+19.7%**） | —（未测，劣化已定） | **否决**（性能劣化） |
+| A1b ws_o bf16 | 46319±362（-0.5%） | — | **否决**（<3% 阈） |
+| A3a LEAD=2 | 45359±238（-2.6%，三轮 45350/45366/45359） | 56473±308（-1.2%） | **否决**（两窗口均 <3% 阈） |
+| c23 = A1b+A3a | — | 56203±247 / 56280±265（-1.3% / -1.5%） | **否决**（<3% 阈） |
+| combo 三合一 | 54773±240（+17.7%，继承 A1a 劣化） | — | 否决（随 A1a） |
+
+- 机器态双峰当日再现：快态窗口（15:37-15:52）v0 46451-46580 vs 慢态窗口（15:56 后）v0 56792-57186，
+  Δ≈22%，与审查 §3.0 记录的 ±18% 形态一致（慢态时段 load avg 5.8-6.2，cannbot 常驻进程；NPU 侧无他人进程）。
+  **所有采纳判定只取同进程同窗口配对差**。
+- 方差纪律：各轮 std 176-580us（<1.1%），a3a 快态三轮轮均值极差 16us——-2.6% 是真实效应（~15σ）而非噪声，
+  但幅度仍低于 3% 采纳阈且随窗口缩水（慢态 -1.2%），按规则回滚（§5 裁定讨论）。
+
+### 3. A1a 证伪链（本轮最重要产出：审查 §4.1/§4.2 的 dtype 流量模型需修正）
+
+**① 算术错误（审查文档层）**：审查 §4.1 A1a 行声称「ws_kv 写/C 读全 fp16」可省 #6 2.42 + #7 2.42 + #14 2.15
++ #2 0.30 = **-7.28GB**，任务书同口径 -7.24GB——但 **fp16 与 bf16 同为 2 字节**，ws_kv/Q 的 GM 流量一字节
+不减。审查自身在 A1a 行写明「P 亦转 fp16 存储……**ws_p 流量不变**」（同为 2B 的正确认知），却在 ws_kv/Q 项上
+做了 ÷2——同一段落内部自相矛盾，属笔误级算术错误。§4.2 的 C1=23.42GB / C2「~26-34ms」全部继承该错误。
+**修正后的真实 dtype 杠杆**只有 fp32→2B 项：ws_o（A1b，-1.07GB，实测 -0.5%）与 ws_s（A1c，-3.22GB，
+审查已因 Lse 容差 7× 余量收缩判「不入稳健组合」）。
+
+**② 实测劣化（硬件层，新规则 R-FP16-NOBW）**：同字节量下 fp16 通路**更慢**。msprof PipeUtilization
+（a1a 单 launch，aic_time 56582 ≈ 快态口径 a1a wall 55743+开销；对照审查 §3.1 v0 aic_time 46627 同快态）：
+
+| 管道 | v0（审查 §3.1，快态） | a1a（本轮实测） | Δ | 字节量 |
+|------|----------------------|-----------------|-----|--------|
+| C cube(mma) | 4481 | 4481 | **0%** | 同（fp16 mma 与 bf16 同速 ✓） |
+| C mte1 (L1→L0) | 4752 | 4752 | **0%** | 同（2B=2B） |
+| **C mte2 (GM→L1)** | 31002 | **39480** | **+27%** | **同**（fp16 拷贝模板效率更低） |
+| C fixpipe | 3127 | 3574 | +14% | 同 |
+| C scalar_mte1_stall | 37341 | 46136 | +23% | — |
+| V mte2 (GM→UB) | 19249 | 22217 | +15% | 同 |
+| V mte3 (UB→GM) | 8391 | 10734 | **+28%** | 同 |
+
+结论：**fp16 的 GM 拷贝（GM→L1 / GM→UB / UB→GM）在 dav_c220 上比 bf16 模板效率低 15-28%**（怀疑与 fp16
+mma 的 L0 分形布局要求不同的 Nd2Nz 变换路径有关，未深挖——A/B 判定已闭合）。零字节节省 × 负效率 = A1a
+纯亏 +19.7%。**任何「fp16 化省流量」的后续提案必须先回答字节从哪里省**（fp16 只在替换 fp32 时省字节）。
+
+### 4. 精度记录（候选虽全否，证据全部在案）
+
+| 候选 | 主 shape vs v0 | vs portable（§9.3 门禁） | 角例 |
+|------|----------------|--------------------------|------|
+| a1a | bitexact=False **57/268M out 元素 1-ULP**（mr=1.0，max_abs 4.883e-04） | out mr=1.0 max_abs 3.906e-03 / lse mr=1.0 max_abs 9.537e-07 | stress_ni4/ni1：out **零差异**（67.3M NaN 位置完全一致，nan/inf xor=0）；bitexact=False 唯一来源 = **1 个 Lse 元素 1-ULP fp32**（6.843316078 vs 6.843315124）——p3「fp16 gemm 1-ULP 累加序」预言的签名 |
+| a1b | bitexact=False 69.8M/268M（中转粒度舍入），mr=1.0 | **out max_abs 3.125e-02（与 iter-4 预测逐位一致）**，Lse 不受影响（9.537e-07） | stress max_abs 1.562e-02-3.125e-02，mr=1.0 |
+| a3a | **bitexact=True ndiff=0**（纯调度改动） | 同 v0 | stress_ni4/ni1 全 bit-exact（含 NI=1 的 LEAD=1 保留路径） |
+
+- 值域谓词边界（a1a 变体，/tmp/opencode/r2/diag_a1a.py）：amax=**65280**（≤65504 的最大 bf16 值）→
+  precast_ok=True 走 fast；amax=**65536** → False 回退 portable——分派树成对更新按设计工作。
+- pto 通道全程零改动（全部变体 pto 输出与 v0 bit-exact，portable 内核未触碰）。
+
+### 5. A3a 裁定讨论（规则 vs 统计显著性的如实记录）
+
+a3a 是本轮唯一「真效应」候选：bit-exact（零精度风险）、快态 -2.6%（三轮极差 16us，~15σ）、结构上是纯
+gather 前瞻加深（V 侧 13.5ms F3 松弛的部分兑现，审查 §4.1 A3a 估 -2~4ms，实测 -1.2ms 快态口径）。
+**仍按规则否决**的理由：(i) 3% 采纳阈是本轮任务书的明文硬规则；(ii) 效应量随机器窗口漂移（快 -2.6% /
+慢 -1.2%），交付态收益不稳；(iii) 与 A1b 叠加（c23）无超线性增益（慢态 -1.5%）。**留档为已验证的待叠
+加项**：若未来任何结构性改动（拆分/rev3）需要重排 V 侧调度，A3a 的 LEAD=2 形态（含 F0 mod-3 奇偶制、
+IDXSLOTS=3、DEPTH=NI+2、NI≤5 门限收紧）可直接复用，变体文件 /tmp/opencode/r2/variants/smf_a3a.py
+与 c23 已验证编译/精度/计时三闭环。
+
+### 6. 修正后的展望（审查 §4.2 C1/C2 行作废后的剩余路线）
+
+- C1/C2 的「23.42GB / 26-34ms」基于幻影 -7.28GB，**作废**。单 kernel 真实流量下限仍是 §4.3① 的全 dtype
+  地板推演去掉 A1a 项后的 ~28.7GB（31.77 − 1.07(A1b) − 2.15(A1c 未采纳)），保守墙 ~42ms——与 iter-7
+  的架构地板结论（52-56ms 慢态口径）同向。
+- 本轮后单 kernel 体制内已无 >3% 的已知合法杠杆（dtype 项证伪/量化至 ≤1%；同步项 A3a 实测 -1.2~2.6%；
+  A3b/A3c 上限更低）。**唯一未闭合通道仍是审查 §4.3② 的双 kernel 拆分（C4/C5）**，其两个带宽假设
+  （BW_A：纯 gather 相 KV 池 L2 驻留；BW_B：22GB 级负载于真实 50.5MB 环集）仍无实测——
+  **下一轮若继续，先做拆分前置探针 ×2**（一天量级，/tmp/opencode/audit2/），任一落保守半区即终止拆分线。
+
+### 7. flag / UB 复核（A3a 实施时的两项硬规则复核）
+
+- **flag 总数**：LEAD=2/NI=4 → F0{n%3} 3 + F1A 4 + F2 4 + F3 2 = **13 ≤ 16** ✓；NI=1/LEAD=1 → 6 ✓；
+  NI=5（门限上限）→ 15 ✓。注意：任务书「F0 奇偶制 flag 数与深度无关」的表述**不成立于 LEAD=2**——
+  F1A 链只保证 V 的 gather 领先 C 的 QK ≤ LEAD 块，LEAD=2 下 parity-2 会出现「V 对 id 的下一 set 早于
+  C 消费上一 set」的竞态（推导：V set(m) 在 F1A(m-3) 之后 = C QK(m-3) 之后，而 C 消费 F0(m-2 的 id) 在
+  QK(m-2)，晚于 QK(m-3)），故必须 mod-3。已按 mod-3 实施并 bit-exact 验证。
+- **UB 水位**：a1a 全项 = 157,344B / 196,352B（cg32 8KB + cg16 4KB 尾部追加）；a1b = +32KB o_stage
+  （32,768B，尾部追加）；三项叠加 193,792B 仍 < 196,352B——尾部追加式改动未触发 R-UB-LAYOUT
+  （既有 buffer 偏移全部不动，a1a/a1b 精度与计时均无布局异常表征）。
+
+### 8. 产物与状态
+
+- 主文件 sparse_mla_fwd.py：**零改动**（md5 2aed46c1 与冻结基线一致；冻结备份
+  history_version/sparse_mla_fwd_perf_r2_base.py 即本轮回滚锚，未产生采纳性迭代快照）
+- 基线 JSON：perf_tuning/sparse_mla_fwd_baseline_r2.json（双窗口基线 + 全部 A/B + oracle + 硬件发现）
+- A/B 基建与探针：/tmp/opencode/r2/{probe_casts.py, probe_casts2.py, make_variants.py, ab_r2.py,
+  prof_r2.py, diag_a1a.py, variants/smf_{a1a,a1b,a3a,c23,combo,v0x}.py,
+  logs/{probe1,probe2,ab_r2,ab_c23,ab_final,msprof_a1a_run,msprof_v0_run,level_all_r2}.log,
+  msprof_a1a/}（探针/变体/画像三级证据链完整可复现）
+- 精度状态：pass 延续（零改动；--level all 当日全量绿见 logs/level_all_r2.log）
+
+next_hint: 单 kernel 证据链已闭合（iter-7 架构地板 + R2 dtype 证伪）。若继续投入：**拆分前置探针
+BW_A/BW_B ×2**（纯 V gather kernel 实测 KV 池驻留带宽；22GB 混合负载于真实 50.5MB 环集实测带宽）——
+两数落定即闭合 C4/C5 判定，避免 rev 级工程沉没；任一落保守半区 → 拆分线终止，Stage 1 重定标
+（目标带 ≥42ms 单 kernel 地板口径 或 A5 平台前提）。A3a 留档为拆分重构时的可复用形态。
+
+
+
+
+
+
