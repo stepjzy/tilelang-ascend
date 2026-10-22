@@ -10,10 +10,10 @@
 | indexer_topk_reducesum | ⏳ 分支已 push，待提 PR | — | fast+generic 双路径；PTO/AscendC 双后端独立调优 |
 | sparse_mla_fwd | ⏳ 分支已 push，待提 PR | — | 支持域 gate + portable 分派；实测证据审查驱动重定标 |
 | sparse_mla_bwd | ⏳ 分支已 push，待提 PR | — | 精度问题定位到设计层的判别法；rev3 回退重来的门禁纪律 |
-| fla_wy_fast | ⏳ 分支已 push，待提 PR | — | fp32 gemm 损坏下的 fp16 hi/lo 拆分模拟；实测带宽校准推翻标称假设；23.15→11.72ms（-49.4%） |
+| fla_wy_fast | 📦 已归档交付 | — | fp32 gemm 损坏下的 fp16 hi/lo 拆分模拟；实测带宽校准推翻标称假设；23.15→11.72ms（-49.4%） |
 
 ## 维护规则
 
 - 归档时机：算子交付（-pr 分支 push）后、主仓清理前（见 tilelang-op-migration skill Phase 4）。
-- PR 状态变化时更新本表 + 对应 00_INDEX.md 的"交付物"章节。
+- PR 的提交/合并与状态跟踪由用户自行处理，journal 归档内容定格在归档时刻，不做后续状态更新。
 - 主仓沙箱 `ref_gpu/` 为共享语义参考，本档案内各算子 `ref_gpu.py` 为其冻结副本。
