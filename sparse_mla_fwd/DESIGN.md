@@ -849,7 +849,7 @@ def make_l0_inputs(S=4096, H=128, HKV=1, DQK=576, topk=1024, dtype=torch.bfloat1
 examples_experiment/dsa_sparse_finetune/
 ├── sparse_mla_fwd.py            # 纯 kernel（@tilelang.jit，target 参数化，可 import）【待实现】
 ├── test_sparse_mla_fwd.py       # kernel import + golden + L0 + 双后端参数化 + main【待实现】
-├── DESIGN_sparse_mla_fwd.md     # 本设计文档（已交付；非 DESIGN.md——那是 indexer_bwd 的）
+├── DESIGN.md     # 本设计文档（已交付；非 DESIGN.md——那是 indexer_bwd 的）
 ├── proto_sparse_mla_fwd.yaml    # 接口规格（已交付，§11.5）
 └── ref_gpu/                     # 主仓参考（只读，不修改）
 ```
@@ -858,7 +858,7 @@ examples_experiment/dsa_sparse_finetune/
 
 | 文件 | 状态 | 说明 |
 |------|------|------|
-| `DESIGN_sparse_mla_fwd.md` | ✅ 已完成 | 本文档 |
+| `DESIGN.md` | ✅ 已完成 | 本文档 |
 | `proto_sparse_mla_fwd.yaml` | ✅ 已完成 | dtype 全集（§9.3）/ attrs（§1/§4/§5.2）机械派生 |
 | `sparse_mla_fwd.py` | ⬜ 待实现 | `tl_sparse_mla_fwd`（builder）+ `sparse_mla_fwd_interface`（host 入口：token_indices 预计算 + _BUILD_CACHE + target 分派）+ `prepare_token_indices` |
 | `test_sparse_mla_fwd.py` | ⬜ 待实现 | `ref_sparse_mla_fwd_interface`（golden，device 参数化）+ L0 用例 ×{ascendc, pto} + perf 哨兵 + main |

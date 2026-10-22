@@ -6,7 +6,7 @@
 
 ## 阅读顺序（约 2.5h）
 1. `ref_gpu.py`（30min）→ 迁移源头：sparse_mla 前向（a3 两遍法）
-2. `DESIGN_sparse_mla_fwd.md`（1h）→ §2 模式选型、§3 API 映射、
+2. `DESIGN.md`（1h）→ §2 模式选型、§3 API 映射、
    §4 数据规格与内存规划、§5 Tiling；**支持域 NI∈[1,6]** 的 gate 定义
    （H=128 ∧ G=1 ∧ (dim,tail)=(512,64) ∧ topk%256==0）与 §11.4 域外
    portable 分派树——特化与通用性的边界设计范例

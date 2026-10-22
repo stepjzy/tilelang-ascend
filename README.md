@@ -8,7 +8,7 @@
 | indexer_bwd | ✅ 已合并 upstream | [#1887](https://github.com/tile-ai/tilelang-ascend/pull/1887) | GM bf16 atomic 累加精度陷阱与受控仿真定位法；1229→68us（-94.4%） |
 | sparse_mla_topk_reducesum | 🔄 PR open | [#1884](https://github.com/tile-ai/tilelang-ascend/pull/1884) | 三条设计路线证伪史；panel 特化→通用基线的取舍 |
 | indexer_topk_reducesum | ⏳ 分支已 push，待提 PR | — | fast+generic 双路径；PTO/AscendC 双后端独立调优 |
-| sparse_mla_fwd | ⏳ 分支已 push，待提 PR | — | 支持域 gate + portable 分派；实测证据审查驱动重定标 |
+| sparse_mla_fwd | ⏳ 分支已 push，待提 PR | — | 支持域 gate + portable 分派；实测证据审查驱动重定标；投影必须 A/B 实证（dtype 包笔误撤回）；138.6→46.7ms（-66.3%，目标 24.3ms 经实测判定平台不可达） |
 | sparse_mla_bwd | ⏳ 分支已 push，待提 PR | — | 精度问题定位到设计层的判别法；rev3 回退重来的门禁纪律 |
 | fla_wy_fast | 📦 已归档交付 | — | fp32 gemm 损坏下的 fp16 hi/lo 拆分模拟；实测带宽校准推翻标称假设；23.15→11.72ms（-49.4%） |
 
