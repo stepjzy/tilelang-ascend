@@ -1,0 +1,17 @@
+{
+  "round": 4,
+  "iteration": 1,
+  "optimization": "host dispatch bypass (_FastLaunch cached low-level launch: cached lib handle + prebuilt argtypes + reused relay workspaces + fresh output; guarded, stream-keyed, bitwise self-check at arm time)",
+  "timestamp": "2026-10-23T23:25:00+08:00",
+  "shape": [1, 8192, 64, 128, 128],
+  "test_command": "python perf_tuning/fla_chunk_o_bench_iter.py (official --level perf protocol)",
+  "baseline": {"mean_ms": 1.492, "steady_ms": 1.411, "first_rep_ms": 2.24, "per_run_means": [1.501, 1.490, 1.484]},
+  "candidate": {"mean_ms": 1.416, "steady_ms": 1.404, "first_rep_ms": 1.54, "per_run_means": [1.418, 1.413, 1.416]},
+  "improvement_pct": -5.1,
+  "improvement_us_mean": -76,
+  "host_dispatch_us": {"before": 795.7, "after": 163.4},
+  "first_rep_exposure_ms": {"before": 0.83, "after": 0.14},
+  "precision": "pass (--level all: L0+L1 11/11 ratio=1.0000, L2 10/10 rejected, Boundary 4 PASS + 2 documented expected WARNs; plus multi-stream interleave and 21+ reuse-iteration checks)",
+  "adopted": true,
+  "notes": "Analyzer ctor 289us + cython shape-reresolve/checks ~292us + alloc5 65us + stream 35us eliminated; JIT lookup 2.4us and lib.call 9us kept. Upstream check: upstream/ascendc_pto (43b0b697) has ZERO diff on tilelang/jit/ vs local HEAD -- no existing fast path to reuse. torch_npu._C._npu_getCurrentRawStream is 45x faster than public current_stream() (0.8 vs 36us) but is a private API -- documented as note, not used."
+}

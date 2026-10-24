@@ -1,0 +1,30 @@
+{
+  "round": 4,
+  "iteration": 0,
+  "timestamp": "2026-10-23T23:20:00+08:00",
+  "shape": [1, 8192, 64, 128, 128],
+  "test_command": "python perf_tuning/fla_chunk_o_bench_iter.py (official --level perf protocol: NPU events, warmup=10, rep=10, mean)",
+  "runs": [
+    {"mean_ms": 1.501, "steady_ms": 1.417, "first_rep_ms": 2.278, "per_rep_ms": [2.278, 1.414, 1.417, 1.403, 1.423, 1.419, 1.399, 1.434, 1.394, 1.430]},
+    {"mean_ms": 1.490, "steady_ms": 1.405, "first_rep_ms": 2.266, "per_rep_ms": [2.266, 1.401, 1.422, 1.402, 1.395, 1.404, 1.399, 1.399, 1.408, 1.406]},
+    {"mean_ms": 1.484, "steady_ms": 1.412, "first_rep_ms": 2.165, "per_rep_ms": [2.165, 1.413, 1.381, 1.420, 1.424, 1.425, 1.422, 1.399, 1.403, 1.387]}
+  ],
+  "representative_mean_ms": 1.492,
+  "steady_ms": 1.411,
+  "first_rep_exposure_ms": 0.83,
+  "precision": "pass (l0_repr quick gate ratio=1.0000, all 3 runs)",
+  "programming_mode": "Developer + manual cross-core flag element (mixed)",
+  "target_ms": 1.320,
+  "host_dispatch_decomposition_us": {
+    "full_wrapper": 795.7,
+    "jit_cache_lookup": 2.4,
+    "cython_forward_total": 681.1,
+    "analyzer_ctor_wasted": 289.4,
+    "torch_empty_x5": 64.8,
+    "stream_query": 35.1,
+    "cython_misc_shape_resolve_checks_ctypes": 291.9,
+    "lib_call_enqueue": 9.1,
+    "projected_fast_path": 132.0
+  },
+  "note": "R3 final state == R4 start (md5 identical). Dispatch decomposition: fla_chunk_o_dispatch_decompose_r4.py."
+}

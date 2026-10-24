@@ -1,0 +1,17 @@
+{
+  "round": 3,
+  "date": "2026-10-23",
+  "operator": "fla_chunk_o",
+  "shape": [1, 8192, 64, 128, 128],
+  "dtype": "bf16 + fp32 gate",
+  "baseline_perf_ms": 1.513,
+  "baseline_steady_ms": 1.41,
+  "per_rep_ms": [2.412, 1.412, 1.399, 1.406, 1.404, 1.401, 1.443, 1.420, 1.423, 1.412],
+  "test_command": "source ../../set_env.sh && python test_fla_chunk_o.py --level perf",
+  "timing_protocol": "NPU events, warmup=10, rep=10, mean, device-side only",
+  "precision": "pass (perf_bench reference check ratio=1.0000)",
+  "programming_mode": "Developer + manual cross-core flag element (mixed)",
+  "target_us": 1320,
+  "noise_threshold_pct": 3,
+  "notes": "First run of session read 2.288ms -- polluted by residual NPU state from earlier gemmprobe session (ended 14:36, AIV usage counter stuck at 97%); second run 1.513ms reproduces R2 final (1.504/1.511/1.541). Baseline taken as 1.513ms. First-rep overhead +1.0ms consistent with orchestrator host-dispatch floor analysis (~0.999ms dispatch exposed when device idle)."
+}

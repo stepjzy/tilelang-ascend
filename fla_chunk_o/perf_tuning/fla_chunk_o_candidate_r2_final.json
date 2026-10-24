@@ -1,0 +1,65 @@
+{
+  "operator": "fla_chunk_o",
+  "round": 2,
+  "iteration": 8,
+  "date": "2026-10-23",
+  "device": "Ascend 910B3 (64GB HBM, 20 AI Cores)",
+  "cann": "9.2.0",
+  "tilelang": "editable @ 2f22c6ac",
+  "benchmark_shape": {
+    "B": 1, "S": 8192, "H": 64, "DK": 128, "DV": 128, "chunk_size": 64,
+    "dtype": "bf16 in/out + fp32 gate, fp32 accumulate",
+    "grid": "fixed-core 20 blocks x batched in-core task loop (2 tasks/step), threads=2"
+  },
+  "timing_protocol": "NPU events, warmup=10, rep=10, mean, device-side only (upstream do_bench parity); no internal sync in wrapper",
+  "test_command": "source ../../set_env.sh && python test_fla_chunk_o.py --level perf",
+  "final_official_ms": [1.504, 1.511, 1.541],
+  "final_representative_ms": 1.51,
+  "final_steady_state_ms": 1.42,
+  "r2_start_ms": 1.690,
+  "r1_final_ms": "1.638-1.658",
+  "original_baseline_ms": 3.285,
+  "improvement_vs_r2_start_pct": -10.7,
+  "improvement_vs_original_pct": -54.0,
+  "target_us": 1320,
+  "target_met": false,
+  "precision_validation": "pass (--level all: L0 2/2 + L1 9/9 ratio=1.0000, L2 10/10 rejected, Boundary 3 PASS + 2 pre-existing WARN)",
+  "adopted_optimizations": [
+    {"name": "C-side fixpipe direct strided O write (o_relay + V drain eliminated)", "gain_ms": 0.04, "note": "structural; toolchain fact corrected: direct bf16 fixpipe store with realDstN stride is exact"},
+    {"name": "Select-free main loop + Select tail", "gain_ms": 0.0, "note": "scalar-neutral but kept (strictly less work)"},
+    {"name": "2-chunk task batching (staging double-buffered, +28KB/vid)", "gain_ms": 0.0, "note": "carrier for ping-pong"},
+    {"name": "L1 operand ping-pong BY NAME (_a/_b) + early B loads", "gain_ms": 0.0, "note": "removed the same-name M_MTE2 serialization (R1 ping-pong failure root-caused)"},
+    {"name": "v relay via Vector (strided read on AIV -> contiguous ws4 -> AIC contiguous read)", "gain_ms": 0.104, "note": "the single biggest R2 win; strided 64x256B v load measured 3x slower than contiguous on the Cube MTE2"},
+    {"name": "in-place V gate chains (tile.mul/exp/sub dst==src)", "gain_ms": 0.0, "note": "-64KB/vid UB enabler, bitwise-exact"},
+    {"name": "o_frag ping-pong per chunk parity", "gain_ms": 0.004, "note": "neutral, fewer sync points"},
+    {"name": "2-batch throttle lag + NSLOT=8 + peel-batch", "gain_ms": 0.038, "note": "steady -58us; relay flags pre-set for the Cube"}
+  ],
+  "rolled_back": [
+    {"name": "O write relayed back to Vector (o_relay + drain)", "regression_ms": 0.18, "reason": "drain chain on the 61%-scalar Vector costs more than the Cube's strided FIX saves; R1 'neutral' verdict reverses when V is loaded"}
+  ],
+  "final_bottleneck": {
+    "aic_mte2_us_per_task": 1.82,
+    "aic_mte2_bytes_per_task_kb": 88,
+    "relay_bytes_per_task_kb": 56,
+    "mte2_contiguous_rate_gbps": 48,
+    "crosscore_flag_protocol_ns": 470,
+    "hbm_utilization_pct": "47-59 (not the wall)",
+    "io_floor_us": 797
+  },
+  "blocked_structural_fixes": [
+    "relay merge (4 flags -> 1) blocked by L1 zN fractal layout (column/row region gemm operands unsafe)",
+    "flag protocol overhead is intrinsic (~470ns x 4/task, partially hidden)",
+    "AUTO_SYNC adjacent set/wait marker pairs prevent MTE2 queue lookahead (toolchain)",
+    "hi/lo single relay precision-failed (R1), a_mask semantically forced, v relay structurally forced"
+  ],
+  "programming_mode": "Developer + mixed manual cross-core throttle flag (ID 12)",
+  "artifacts": [
+    "perf_tuning/fla_chunk_o_optimization_log_r2.md",
+    "perf_tuning/fla_chunk_o_baseline_r2_iter0.json",
+    "perf_tuning/fla_chunk_o_impl_r2_final.py",
+    "perf_tuning/fla_chunk_o_kernel_source_r2_{start,iter1_directO,iter2_selectfree,iter3_batch,iter4_pingpong}.c",
+    "perf_tuning/msprof_output_r2{,b,c}/",
+    "perf_tuning/fla_chunk_o_msprof_target_r2.py",
+    "history_version/fla_chunk_o_perf_r2_{start,iter1_directO,iter2_selectfree,iter3_batch,iter5_vrelay,iter6_vprefetch,iter8_ofragpp,final}.py"
+  ]
+}

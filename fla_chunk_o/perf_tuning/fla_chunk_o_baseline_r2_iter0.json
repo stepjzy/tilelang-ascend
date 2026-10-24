@@ -1,0 +1,37 @@
+{
+  "operator": "fla_chunk_o",
+  "round": 2,
+  "iteration": 0,
+  "date": "2026-10-23",
+  "device": "Ascend 910B3 (64GB HBM, 20 AI Cores)",
+  "cann": "9.2.0",
+  "tilelang": "editable @ 2f22c6ac",
+  "benchmark_shape": {
+    "B": 1, "S": 8192, "H": 64, "DK": 128, "DV": 128, "chunk_size": 64,
+    "dtype": "bf16 in/out + fp32 gate, fp32 accumulate",
+    "grid": "fixed-core 20 blocks x in-core task loop (TPT=410), threads=2"
+  },
+  "timing_protocol": "NPU events, warmup=10, rep=10, mean, device-side only (upstream do_bench parity); no internal sync in wrapper",
+  "test_command": "source ../../set_env.sh && python test_fla_chunk_o.py --level perf",
+  "baseline_time_ms": 1.690,
+  "baseline_steady_state_ms": 1.58,
+  "per_rep_ms": [2.691, 1.571, 1.608, 1.483, 1.603, 1.623, 1.567, 1.598, 1.541, 1.610],
+  "r1_final_official_ms": "1.638-1.658 (4 runs, representative 1.65)",
+  "precision_status": "pass (ratio=1.0000, max_abs=1.250e-01)",
+  "programming_mode": "Developer + mixed manual cross-core flag (o_relay path)",
+  "target_us": 1320,
+  "r2_priorities": [
+    "1. UB capacity freeing -> 2-chunk task batching (R1 estimate ~1.25ms)",
+    "2. Manual flags for hi/lo/a auto-flag relay pairs (o path manual flag gave -9%)",
+    "3. New clues from msprof data"
+  ],
+  "prohibited_retries": [
+    "threads=2 bare switch (no 3D view)", "PTO target (+3.7%)",
+    "L1 ping-pong + h/v prefetch x2 variants", "pure auto flag 2-late drain (deadlock)",
+    "2-chunk batching WITHOUT freeing UB first (UB overflow)",
+    "hi/lo single relay row packing", "K-concat single gemm", "bf16 domain mask",
+    "gate chain fusion", "removing hi/lo double gemm (precision fail)"
+  ],
+  "noise_threshold_pct": 3,
+  "notes": "R2 start point consistent with R1 final (1.690 vs 1.638-1.658, within device noise +-2-3%)."
+}

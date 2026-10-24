@@ -1,0 +1,16 @@
+{
+  "round": 4,
+  "iteration": 2,
+  "optimization": "4-chunk task batching (attempted, ABANDONED at compile)",
+  "timestamp": "2026-10-23T23:55:00+08:00",
+  "prechecks": {
+    "ub_budget": "4-chunk staging needs +36864 B/vid (v 8K + a 4K + q 8K + g 16K at DK=DV=128); L1 4 operand sets 352KB < 512KB OK; NSLOT 9->12 ring-safe (4d==m mod 12 unsolvable for d<=2, m in [0,3]);",
+    "flag_id_space_probe": "THROTTLE 48->64 on the 3-chunk kernel: bench 1.420/steady 1.408 + precision PASS, behavior identical to 48 -> ID 64 distinct from 0-47, >= 65 distinct cross-core flag IDs available (documented ISASI range 0-10, CANN atlasascendc_api_07_0273; empirically wider on 910B3)"
+  },
+  "result": "SEGFAULT (exit 139) during TVM OptimizeForTarget for shapes with DK=DV=128 ((1,128,2,64,64) with DK=64/DV=64 compiled and PASSED ratio=1.0000; (2,256,4,128,128) crashed)",
+  "root_cause": "tilelang A2/A3 UB hard cap = 196352 B (src/transform/ascend_memory_planning.cc:35 ASCEND_SHARED_MEM_SIZE; src/target/codegen_ascend.cc:40 ASCEND_A2A3_UB_SIZE). The 3-chunk kernel's ascend_ub allocation is EXACTLY 196352 B (100.0% of the cap, verified in fla_chunk_o_kernel_source_r3_final.c line 42). The 4th chunk's staging (+36864 B) overflows; the memory-planning pass fails a raw C-level check and crashes through FFI as a segfault instead of a clean Python error.",
+  "why_not_squeezable": "Every UB staging buffer is live at the pipeline peak (3 in-flight chunks' a/q/g/v staging + the next-batch prefetch double-booking of each buffer in place). Vector-side buffers cannot move to L1 (memory hierarchy: L1 is Cube-only). The shared math buffers (a_f32/a_mask/q_ub/qg_hi_ub/qg_hi_f32/qg_lo_ub) are already single-instance reused per chunk.",
+  "adopted": false,
+  "rollback": "restored history_version/fla_chunk_o_perf_r4_iter1_fastdispatch.py (md5 verified)",
+  "conclusion": "4-chunk batching is infeasible for the bench shape under tilelang's 192KB-class UB cap; the 3-chunk design already saturates UB exactly. Recorded as a structural bound: deeper batching on this operator family requires either smaller per-chunk staging (impossible: IO-unique full-row loads) or a larger UB budget (A5: 262144 B per codegen_ascend.cc:46)."
+}

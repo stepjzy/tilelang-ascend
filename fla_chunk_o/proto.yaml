@@ -1,0 +1,64 @@
+# proto.yaml — fla_chunk_o 算子接口规格（KDA chunked 前向输出 O，单 kernel）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_chunk_o.py                Triton/FLA 参考实现（语义权威 + 测试样例对齐）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_chunk_o.py
+#     本次范围仅 chunk_gla_fwd_kernel_o / wrapper chunk_gla_fwd_o_gk（fwd O）；
+#     文件内其余 bwd kernel（bwd_dv / bwd_inter / dv_local / dA）归属源仓其他独立
+#     示例，不在本次范围（用户确认 2026-10-22）。
+#   - ref_gpu/fla_chunk_o_tilelang_fwd.py   上游 TileLang CUDA 前向（代码级迁移起点）
+#     ← tile-ai/tilelang@main examples/kda/chunk_o.py
+#   - ref_gpu/test_utils_kda.py             上游 do_bench 计时口径（warmup, rep, mean）
+# 范围：定长序列（非 varlen）、use_exp2=True（对齐上游 benchmark main()）；
+#   varlen / use_exp2=False 分支不在本次范围。
+# 编程模式：Developer（用户指定，2026-10-22）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/precision-standard.md
+#   混合容差，golden = PyTorch 重写参考实现）：
+#   - O（bf16 输出）：atol 2^-10, rtol 2^-6, max_abs_error_limit 1e0, matched_ratio ≥ 0.99
+# 性能目标：纯 Kernel 时间（单 kernel）< 1320 us；
+#   口径 = 主仓原 GPU 测试样例（对齐 examples/kda/chunk_o.py do_bench：
+#   预热 10 次后重复 10 次取平均，仅设备侧 kernel 执行时间，不含张量构造/
+#   H2D-D2H/JIT/框架开销）：
+#   - benchmark：B=1, S=8192, H=64, DK=128, DV=128, chunk_size=64，
+#     input/output bf16（gate fp32，累加 fp32），输出 O [B,S,H,DV]
+operator:
+  name: fla_chunk_o
+  category: Fusion  # C/V 混合：GEMM (Cube) + exp2/逐元素乘 (Vector)
+  formula: |
+    记 chunk 长度 BT=64（S 可整除），c = t // BT 为 chunk 序号，
+    scale = 1/sqrt(DK)，g 为逐 token 累积 log2 衰减（fp32），
+    A 为 chunk 内 attention 矩阵 [BT, BT]（上游 chunk_intra 已算好，本算子只消费），
+    h 为 chunk 级隐状态 [DK, DV]（上游 chunk_delta_h_fwd 已算好，本算子只消费），
+    tril_incl_diag(M) = 保留下三角含对角（i >= j），上三角置 0；⊙ 为逐元素乘。
+    fwd O（逐 chunk 逐 head，输出 [BT, DV]）：
+      qg[t:t+BT, h, :] = (q[t:t+BT, h, :] * scale) ⊙ 2^g[t:t+BT, h, :]   # [BT, DK]
+      o[t:t+BT, h, :]  = qg @ h[c, h, :, :]                              # inter-chunk，按 DK 分块累加
+                        + tril_incl_diag(A[t:t+BT, h, :]) @ v[t:t+BT, h, :]  # intra-chunk
+    （等价 Triton 参考实现：b_o += tl.dot(b_qg, b_h) 循环 i_k；b_o += tl.dot(b_A_masked, b_v)）
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: scale
+      type: Float
+      default: 1/sqrt(DK)
+      required: false
+  inputs:
+    - name: q       # [B, S, H, DK]
+      dtype: [bfloat16]
+    - name: v       # [B, S, H, DV]
+      dtype: [bfloat16]
+    - name: g       # [B, S, H, DK] 逐 token 累积 log2 衰减
+      dtype: [float32]
+    - name: A       # [B, S, H, chunk_size] chunk 内 attention 矩阵
+      dtype: [bfloat16]
+    - name: h       # [B, S//chunk_size, H, DK, DV] chunk 级隐状态
+      dtype: [bfloat16]
+  outputs:
+    - name: o       # [B, S, H, DV]
+      dtype: [bfloat16]
+  schema: >-
+    fla_chunk_o_fwd(q: Tensor[B,S,H,DK] bf16, v: Tensor[B,S,H,DV] bf16,
+    g: Tensor[B,S,H,DK] fp32, A: Tensor[B,S,H,64] bf16,
+    h: Tensor[B,S//64,H,DK,DV] bf16, scale: float = 1/sqrt(DK),
+    chunk_size: int = 64) -> o: Tensor[B,S,H,DV] bf16
