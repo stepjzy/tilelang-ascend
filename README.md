@@ -11,6 +11,7 @@
 | sparse_mla_fwd | ⏳ 分支已 push，待提 PR | — | 支持域 gate + portable 分派；实测证据审查驱动重定标；投影必须 A/B 实证（dtype 包笔误撤回）；138.6→46.7ms（-66.3%，目标 24.3ms 经实测判定平台不可达） |
 | sparse_mla_bwd | ⏳ 分支已 push，待提 PR | — | 精度问题定位到设计层的判别法；rev3 回退重来的门禁纪律 |
 | fla_wy_fast | 📦 已归档交付 | — | fp32 gemm 损坏下的 fp16 hi/lo 拆分模拟；实测带宽校准推翻标称假设；23.15→11.72ms（-49.4%） |
+| fla_chunk_intra_token_parallel | ⏳ 分支已 push，待提 PR | — | msprof 流水图驱动瓶颈重归因（空闲 Cube 卸载 -49%）；四条直觉瓶颈实测证伪史；分离核 relay 地板论证；19150→1739us（11.0×，目标 370us 经论证物理不可达） |
 | fla_chunk_o | ⏳ 分支已 push，待提 PR | — | CV 中继型算子的同步协议地板画像法（msprof 消融 + host 分发地板核算）；Developer 模式边界实证；3.285→1.417ms（-57%，目标 1320us 为工具链级地板所封） |
 
 ## 维护规则

@@ -1,0 +1,30 @@
+{
+  "label": "iter9_candidate_bf16_relay",
+  "note": "REJECTED (wall regression -4.7%); precision bit-perfect. Kernel rolled back to iter8 (md5 dafbcb35).",
+  "candidate_events_mean_us": 2229.9,
+  "candidate_per_rep_us_note": "steady ~2070-2090 first-rep 2630 (see bf16relay_probe_iter9_bench.log)",
+  "same_session_iter8_ref_us": 2129.8,
+  "recorded_iter8_baseline_us": 2125.0,
+  "improvement_pct_vs_ref": -4.70,
+  "improvement_pct_vs_recorded": -4.94,
+  "precision": {
+    "bit_agreement_vs_iter8": {
+      "randn": [1.0, 1.0],
+      "dbound": [1.0, 1.0],
+      "infq": [1.0, 1.0],
+      "h6_bh2": [1.0, 1.0],
+      "h12_bh4": [1.0, 1.0],
+      "h2_min": [1.0, 1.0],
+      "dk48": [1.0, 1.0],
+      "scs8_fp32_fallback": [1.0, 1.0]
+    },
+    "golden_ratios_all": 1.0,
+    "note": "fixpipe fp32->bf16 rounding is bit-identical to the V-side CAST_RINT path; SCS=8 needs the fp32 relay fallback (bf16 [16,8] relay rows are 16B < DMA alignment)"
+  },
+  "other_candidates": {
+    "ggrp8_kl0size64": "static_assert dead: gemm_v0 L0A ping-pong budget = 64KB/step-count (32KB for any multi-K-step call), fp32 M=256 tile never fits; iter7 ggrp1-vs-ggrp4 data prices one gemm call at ~0.14us so GGRP=8 (2x mac, 2x fixpipe waste) is net negative even via kL0Size=32",
+    "per_group_pingpong_l1_l0c": "blocked 3 ways: AUTO_CV_SYNC workspace site-count parity (cube 6 vs vec 3), zN fractal L1 layout invalidates region-sliced gemm operands (measured FAIL 0.87/0.54), gemm_v0 template's internal FIX_M wait serializes mma(g1) after fixpipe(g0) regardless of L0C slot names; residual value ~1-2% redundant pass flags only",
+    "v_side_gm_prefetch": "0 expected: AIC 99.55% busy is the wall; V never blocks C in steady state"
+  },
+  "final_state": "rolled back to iter8 adopted version; full gate green (13 PRECISION_PASS + 14 BOUNDARY_PASS / 0 FAIL, split-level runs in logs_iter9/); baseline re-bench 2139.7us events / 2089.6 loop"
+}

@@ -1,0 +1,29 @@
+{
+  "shape": [
+    1,
+    8192,
+    64,
+    128
+  ],
+  "chunk_size": 64,
+  "sub_chunk_size": 16,
+  "timing_method": "torch.npu.Event(enable_timing=True), warmup=20 rep=10 mean, device-side only (upstream do_bench parity); loop mode cross-check",
+  "events_mean_us": 2139.6960020065308,
+  "per_rep_us": [
+    2798.9399433135986,
+    2061.6800785064697,
+    2067.3201084136963,
+    2065.959930419922,
+    2069.700002670288,
+    2068.5999393463135,
+    2074.1000175476074,
+    2062.000036239624,
+    2063.2400512695312,
+    2065.419912338257
+  ],
+  "loop_mean_us": 2089.5660400390625,
+  "io_bytes": 621805568,
+  "effective_bw_gbs": 290.6046314134778,
+  "bw_utilization_pct": 23.009076121415504,
+  "bandwidth_floor_us": 492.3242818685669
+}

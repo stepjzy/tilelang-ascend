@@ -1,0 +1,35 @@
+{
+  "iteration": 3,
+  "kernel_version": "iter1 adopted (hot-loop restructure, row-batched tiles + h-major layout)",
+  "programming_mode": "Developer (alloc_shared + AUTO_SYNC/AUTO_CV_COMBINE/MEMORY_PLANNING pass_configs)",
+  "precision_status": "pass (Stage 2 baseline + iter1/iter2 --level all exit 0)",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_intra_token_parallel.py --level all",
+  "bench_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_intra_token_parallel_bench_iter.py --json-out .../fla_chunk_intra_token_parallel_baseline_iter3.json",
+  "shape": [
+    1,
+    8192,
+    64,
+    128
+  ],
+  "chunk_size": 64,
+  "sub_chunk_size": 16,
+  "timing_method": "torch.npu.Event(enable_timing=True), warmup=20 rep=10 mean, device-side only (upstream do_bench parity); loop mode cross-check",
+  "events_mean_us": 9071.35009765625,
+  "per_rep_us": [
+    9662.34016418457,
+    9001.839637756348,
+    9005.260467529297,
+    9002.240180969238,
+    9002.94017791748,
+    9001.660346984863,
+    9015.600204467773,
+    8998.640060424805,
+    9016.839981079102,
+    9006.139755249023
+  ],
+  "loop_mean_us": 9022.911580403646,
+  "io_bytes": 621805568,
+  "effective_bw_gbs": 68.54608865340286,
+  "bw_utilization_pct": 5.427243757197376,
+  "bandwidth_floor_us": 492.3242818685669
+}

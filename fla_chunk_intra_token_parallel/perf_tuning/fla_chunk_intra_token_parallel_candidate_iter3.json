@@ -1,0 +1,45 @@
+{
+  "iteration": 3,
+  "optimization": "factored pairwise recompute (mid-anchor E+/E- split, DESIGN 10.4-C): one-shot Q'/K'/K'' whole-row slabs, per-i chain 11 -> 7 ops",
+  "precision_validation": "pass (--level all exit 0: L0 3/3 + golden + L1 9/9 + L2 10/10 + Boundary 4/4, all ratio=1.0000; bnd_dbound deep-decay in-domain)",
+  "rerun_events_mean_us": 6917.3,
+  "improvement_vs_baseline_pct": -23.75,
+  "decomposition_cross_check": {
+    "P_dma_us": 828.2,
+    "vector_chain_baseline_us": 6181.3,
+    "vector_chain_candidate_us": 6917.3 - 828.2 - 2055.8,
+    "reduce_us": 2055.8
+  },
+  "static_census_per_h_iter": {
+    "baseline": {"Broadcast": 45, "Sub": 15, "Exp": 15, "Mul": 46, "Muls": 16, "non_reduce_total": 137},
+    "candidate": {"Broadcast": 31, "Sub": 2, "Exp": 2, "Mul": 34, "Muls": 16, "non_reduce_total": 85},
+    "reduce_2d": "31 per h-iter (unchanged)"
+  },
+  "shape": [
+    1,
+    8192,
+    64,
+    128
+  ],
+  "chunk_size": 64,
+  "sub_chunk_size": 16,
+  "timing_method": "torch.npu.Event(enable_timing=True), warmup=20 rep=10 mean, device-side only (upstream do_bench parity); loop mode cross-check",
+  "events_mean_us": 6913.86194229126,
+  "per_rep_us": [
+    7494.259834289551,
+    6850.039958953857,
+    6851.840019226074,
+    6843.619823455811,
+    6850.14009475708,
+    6849.540233612061,
+    6844.379901885986,
+    6848.599910736084,
+    6853.059768676758,
+    6853.139877319336
+  ],
+  "loop_mean_us": 6868.003336588542,
+  "io_bytes": 621805568,
+  "effective_bw_gbs": 89.9360694775362,
+  "bw_utilization_pct": 7.120828937255438,
+  "bandwidth_floor_us": 492.3242818685669
+}

@@ -1,0 +1,83 @@
+# proto.yaml — fla_chunk_intra_token_parallel 算子接口规格
+#   （KDA intra-chunk token-parallel：per-token 衰减内积 Aqk/Akk 生成）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_chunk_intra_token_parallel.py             Triton/FLA 参考实现
+#     （语义权威；token-parallel，每 token 一个 block，in-place 写 Aqk/Akk）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_chunk_intra_token_parallel.py
+#   - ref_gpu/fla_chunk_intra_token_parallel_tilelang_gpu.py 上游 TileLang CUDA 实现
+#     + 测试样例 main()（代码级迁移起点；Developer 模式 + autotune
+#     block_H/threads/num_stages）
+#     ← tile-ai/tilelang@main examples/kda/chunk_intra_token_parallel.py
+#   - ref_gpu/fla_chunk_intra_cumsum.py                    测试输入构造语义参考
+#     （prepare_input: gk = logsigmoid(randn) 后 chunk_local_cumsum）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/cumsum.py
+#   - ref_gpu/test_utils_kda.py                            do_bench 计时口径
+#     （warmup=20, rep=10, mean，仅设备侧 kernel 时间）
+# 范围：定长序列（非 varlen），scale=1.0（对齐上游 tilelang 测试样例 main()）；
+#   varlen（cu_seqlens 二分查找）与 scale≠1 透传不在本次范围。
+# 编程模式：Developer（用户指定，2026-10-22）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/
+#   precision-standard.md 混合容差，golden = PyTorch 重写参考实现）：
+#   - 输出 Aqk/Akk 均为 bf16：atol 2^-10, rtol 2^-6, max_abs_error_limit 1e0,
+#     matched_ratio ≥ 0.99（双门限，inf/nan 结构比对）
+# 性能目标：纯 Kernel 时间（单 kernel）总耗时 < 370 us；
+#   口径 = 主仓原 GPU 测试样例（对齐 ref_gpu/test_utils_kda.py do_bench：
+#   预热 20 次后重复 10 次取平均，仅设备侧 kernel 执行时间，不含张量构造/
+#   H2D-D2H/JIT/框架开销）；benchmark 配置 = 上游 main()：
+#   B=1, S=8192, H=64, DK=128, chunk_size=64, sub_chunk_size=16,
+#   input bf16（q/k/beta）/ gate fp32（gk）/ accum fp32 / output bf16, scale=1.0
+operator:
+  name: fla_chunk_intra_token_parallel
+  category: Fusion  # Vector 为主：exp2/逐元素乘/rowsum reduce，无 GEMM
+  formula: |
+    记 chunk_size CS=64（S 可整除）、sub_chunk_size SCS=16。对 batch b、
+    全局 token 序号 i ∈ [0, S)、head h：
+      chunk 序号 c   = i // CS
+      subchunk 序号 s = (i % CS) // SCS
+      subchunk 首坐标 i_ts = c*CS + s*SCS
+    对 j ∈ [i_ts, min(i+1, i_ts+SCS))（即 subchunk 内自身及前序 token）：
+      kgj[h,k]  = k[b,j,h,k] * 2^(g[b,i,h,k] - g[b,j,h,k])     # 逐 k 衰减
+      Aqk[b,i,h,(j % CS)] = scale * Σ_k q[b,i,h,k] * kgj[h,k]
+      Akk[b,i,h,(j-i_ts)] = (j < i) ? Σ_k (beta[b,i,h]*k[b,i,h,k]) * kgj[h,k] : 0
+    Aqk 行内未被 j 覆盖的位置置 0（上游 tilelang 版 T.clear 后全行写出；
+    Triton 版仅写 j 覆盖位，golden 以清零语义为准）。Akk 的 j==i 对角位恒 0。
+    g = gk 为 chunk 内累积 log2 衰减（cumsum 输出），g_i - g_j ≤ 0（j ≤ i
+    时衰减 ≤ 1），2^(g_i-g_j) = exp2(g_i - g_j)。
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: sub_chunk_size
+      type: Int
+      default: 16
+      required: false
+    - name: scale
+      type: Float
+      default: 1.0    # 上游 tilelang 测试样例固定 1.0；kernel 不透传
+      required: false
+  inputs:
+    - name: q     # [B, S, H, DK]
+      dtype: [bfloat16]
+    - name: k     # [B, S, H, DK]
+      dtype: [bfloat16]
+    - name: gk    # [B, S, H, DK] chunk 内累积 log2 衰减（cumsum 输出）
+      dtype: [float32]
+    - name: beta  # [B, S, H]
+      dtype: [bfloat16]
+  outputs:
+    - name: Aqk   # [B, S, H, CS]  chunk 内 A_qk 行（未覆盖位置 0）
+      dtype: [bfloat16]
+    - name: Akk   # [B, S, H, SCS] 对角 subchunk 的 A_kk 行（对角位 0）
+      dtype: [bfloat16]
+  schema: >-
+    fla_chunk_intra_token_parallel(q: Tensor[B,S,H,DK] bf16,
+    k: Tensor[B,S,H,DK] bf16, gk: Tensor[B,S,H,DK] fp32,
+    beta: Tensor[B,S,H] bf16, chunk_size: int = 64,
+    sub_chunk_size: int = 16) -> (Aqk: Tensor[B,S,H,64] bf16,
+    Akk: Tensor[B,S,H,16] bf16)
+benchmark:
+  shape: {B: 1, S: 8192, H: 64, DK: 128, chunk_size: 64, sub_chunk_size: 16}
+  dtype: {input: bfloat16, gate: float32, accum: float32, output: bfloat16}
+  perf_target_kernel_us: 370   # 纯 Kernel 合计（单 kernel）< 370us
+  timing: do_bench(warmup=20, rep=10, mean, device-side only)
