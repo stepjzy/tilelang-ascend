@@ -30,8 +30,7 @@ def make_inputs(B, S, H, DK, chunk, seed):
     q = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
     k = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
     beta = torch.randn(B, S, H, generator=gen).to(torch.bfloat16)
-    gk = torch.nn.functional.logsigmoid(
-        torch.randn(B, S, H, DK, generator=gen, dtype=torch.float32))
+    gk = torch.nn.functional.logsigmoid(torch.randn(B, S, H, DK, generator=gen, dtype=torch.float32))
     gk = gk.view(B, S // chunk, chunk, H, DK).cumsum(dim=2).view(B, S, H, DK)
     cpu = (q, k, gk, beta)
     npu = tuple(t.npu() for t in cpu)
@@ -79,33 +78,77 @@ def check_output(name, out, ref, atol, rtol, max_abs_limit, required_ratio):
     abs_err = (y_cpu[m] - ref_cpu[m]).abs()
     ratio = (abs_err <= (atol + rtol * ref_cpu[m].abs())).float().mean().item()
     max_abs = abs_err.max().item()
-    assert ratio >= required_ratio and max_abs <= max_abs_limit, (
-        f"{name} precision fail: ratio={ratio:.4f} max_abs={max_abs:.3e}"
-    )
+    assert ratio >= required_ratio and max_abs <= max_abs_limit, f"{name} precision fail: ratio={ratio:.4f} max_abs={max_abs:.3e}"
     print(f"Test pass! {name}: matched_ratio={ratio:.4f} max_abs={max_abs:.3e}")
+
+
+def make_deep_gate_inputs(DK, seed):
+    """All-ones q/k/beta and gk[t] = -1e8 - 8*t: deep absolute gates with
+    small raw-domain differences. 2^-8 must be computed from the RAW
+    difference (g_1 - g_0 = -8 exactly at 1-ulp gate spacing); scaling by
+    ln2 BEFORE the subtraction would round the scaled values together and
+    yield 2^0 = 1. Aqk[1, 0] must read 32 * 2^-8 = 0.125."""
+    q = torch.ones(1, 64, 8, DK, dtype=torch.bfloat16)
+    k = torch.ones(1, 64, 8, DK, dtype=torch.bfloat16)
+    beta = torch.ones(1, 64, 8, dtype=torch.bfloat16)
+    t = torch.arange(64, dtype=torch.float32)
+    gk = (-1e8 - 8 * t).view(1, 64, 1, 1).expand(1, 64, 8, DK).contiguous()
+    cpu = (q, k, gk, beta)
+    npu = tuple(x.npu() for x in cpu)
+    return npu, cpu
 
 
 if __name__ == "__main__":
     tilelang.cache.clear_cache()
     torch.manual_seed(0)
 
-    # Representative configs: L0 benchmark structure + L1 multi-batch aligned
+    # Representative configs: L0 benchmark structure + L1 regressions
     test_configs = [
         ("l0_bench_repr", (1, 1024, 64, 128), 1001, "L0"),  # H=64, full BH=8 head groups
         ("l1_aligned", (2, 128, 8, 128), 2101, "L1"),  # multi-batch regular shape
+        # deep absolute gates: raw-domain anchor subtraction (review fix)
+        ("l1_deep_gate", (1, 64, 8, 32), 2201, "L1"),
+        # DK=256: BH adapts 8 -> 2 under the 192KB UB coexistence budget
+        ("l1_dk256_bh2", (1, 64, 8, 256), 2301, "L1"),
     ]
 
     for name, shape, seed, level in test_configs:
         B, S, H, DK = shape
         print(f"Testing fla_chunk_intra_token_parallel {level}/{name} with shape={shape}")
-        npu_in, cpu_in = make_inputs(B, S, H, DK, 64, seed)
+        if name == "l1_deep_gate":
+            npu_in, cpu_in = make_deep_gate_inputs(DK, seed)
+        else:
+            npu_in, cpu_in = make_inputs(B, S, H, DK, 64, seed)
         aqk, akk = fla_chunk_intra_token_parallel(*npu_in)
         torch.npu.synchronize()
         print("Init successful!")
         g_aqk, g_akk = fla_chunk_intra_token_parallel_ref(*cpu_in)
+        if name == "l1_deep_gate":
+            # the exact sentinel from the review: Aqk[1, 0] = 32 * 2^-8
+            v = aqk[0, 1, 0, 0].item()
+            assert abs(v - 0.125) < 1e-3, f"deep-gate sentinel: Aqk[1,0]={v}, expected 0.125"
+            print(f"Test pass! deep-gate sentinel: Aqk[1,0] = {v} (expected 0.125)")
         # bf16 mixed tolerance
         atol, rtol, max_abs_limit, required_ratio = 2**-10, 2**-6, 1e0, 0.99
         check_output("Aqk", aqk, g_aqk, atol, rtol, max_abs_limit, required_ratio)
         check_output("Akk", akk, g_akk, atol, rtol, max_abs_limit, required_ratio)
+
+    # Domain gates: out-of-budget / non-pow2 configs must be rejected cleanly
+    q = torch.randn(1, 64, 8, 512).to(torch.bfloat16).npu()
+    k = torch.randn(1, 64, 8, 512).to(torch.bfloat16).npu()
+    beta = torch.randn(1, 64, 8).to(torch.bfloat16).npu()
+    gk = torch.randn(1, 64, 8, 512, dtype=torch.float32).npu()
+    try:
+        fla_chunk_intra_token_parallel(q, k, gk, beta)
+        raise AssertionError("DK=512 must be rejected (192KB UB budget)")
+    except ValueError as exc:
+        print(f"Test pass! DK=512 rejected: {str(exc)[:80]}...")
+    try:
+        fla_chunk_intra_token_parallel(
+            q[:, :, :, :32].contiguous(), k[:, :, :, :32].contiguous(), gk[:, :, :, :32].contiguous(), beta, chunk_size=48, sub_chunk_size=3
+        )
+        raise AssertionError("CS=48/SCS=3 must be rejected (pow2 tile alignment)")
+    except ValueError as exc:
+        print(f"Test pass! CS=48/SCS=3 rejected: {str(exc)[:80]}...")
 
     print("Kernel Output Match!")
