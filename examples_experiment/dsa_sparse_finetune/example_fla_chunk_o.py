@@ -175,10 +175,7 @@ def _pick_block_dk(dim: int) -> int:
     blk = dim // 2
     if dim % 2 == 0 and blk in (32, 48, 64):
         return blk
-    raise ValueError(
-        f"DK={dim} unsupported: the delivered contract restricts DK to"
-        " one of {64, 96, 128} (documented limitation)"
-    )
+    raise ValueError(f"DK={dim} unsupported: the delivered contract restricts DK to one of {{64, 96, 128}} (documented limitation)")
 
 
 def _pick_block_dv(dim: int) -> int:
@@ -1105,9 +1102,22 @@ class _FastLaunch:
     always the caller's current stream on a hit.
     """
 
-    __slots__ = ("lib", "ws", "ws_ptrs", "out_shape", "out_dtype", "dev",
-                 "dev_idx", "stream_raw", "eq_q", "eq_v", "eq_g", "eq_A",
-                 "eq_h", "msk")
+    __slots__ = (
+        "lib",
+        "ws",
+        "ws_ptrs",
+        "out_shape",
+        "out_dtype",
+        "dev",
+        "dev_idx",
+        "stream_raw",
+        "eq_q",
+        "eq_v",
+        "eq_g",
+        "eq_A",
+        "eq_h",
+        "msk",
+    )
 
     def __init__(self, kernel, dev_idx, stream_raw, msk):
         adapter = kernel.adapter
@@ -1128,8 +1138,7 @@ class _FastLaunch:
         # pointers (the cython path passes c_void_p objects, which stay
         # compatible).
         self.lib.call.argtypes = [ctypes.c_void_p] * 12
-        self.ws = [torch.empty(tuple(params[i].shape), dtype=params[i].dtype, device=self.dev)
-                   for i in _WS_IDX]
+        self.ws = [torch.empty(tuple(params[i].shape), dtype=params[i].dtype, device=self.dev) for i in _WS_IDX]
         self.ws_ptrs = [t.data_ptr() for t in self.ws]
         p_out = params[_OUT_IDX[0]]
         self.out_shape = tuple(p_out.shape)
@@ -1138,24 +1147,47 @@ class _FastLaunch:
     def set_expect(self, q, v, g, A, h):
         """Snapshot the validated input shapes (arm time)."""
         self.eq_q, self.eq_v, self.eq_g, self.eq_A, self.eq_h = (
-            tuple(q.shape), tuple(v.shape), tuple(g.shape), tuple(A.shape), tuple(h.shape))
+            tuple(q.shape),
+            tuple(v.shape),
+            tuple(g.shape),
+            tuple(A.shape),
+            tuple(h.shape),
+        )
 
     def launch(self, q, v, g, A, h, msk):
         """Guarded fast launch. Raises _GuardFail -> public path fallback."""
-        if (q.shape != self.eq_q or v.shape != self.eq_v or g.shape != self.eq_g
-                or A.shape != self.eq_A or h.shape != self.eq_h
-                or q.dtype is not torch.bfloat16 or v.dtype is not torch.bfloat16
-                or g.dtype is not torch.float32 or A.dtype is not torch.bfloat16
-                or h.dtype is not torch.bfloat16
-                or not (q.is_contiguous() and v.is_contiguous() and g.is_contiguous()
-                        and A.is_contiguous() and h.is_contiguous())
-                or q.device.index != self.dev_idx or msk is not self.msk):
+        if (
+            q.shape != self.eq_q
+            or v.shape != self.eq_v
+            or g.shape != self.eq_g
+            or A.shape != self.eq_A
+            or h.shape != self.eq_h
+            or q.dtype is not torch.bfloat16
+            or v.dtype is not torch.bfloat16
+            or g.dtype is not torch.float32
+            or A.dtype is not torch.bfloat16
+            or h.dtype is not torch.bfloat16
+            or not (q.is_contiguous() and v.is_contiguous() and g.is_contiguous() and A.is_contiguous() and h.is_contiguous())
+            or q.device.index != self.dev_idx
+            or msk is not self.msk
+        ):
             raise _GuardFail("input guard")
         o = torch.empty(self.out_shape, dtype=self.out_dtype, device=self.dev)
         wp = self.ws_ptrs
-        self.lib.call(q.data_ptr(), v.data_ptr(), g.data_ptr(), A.data_ptr(),
-                      h.data_ptr(), msk.data_ptr(), wp[0], wp[1], wp[2], wp[3],
-                      o.data_ptr(), self.stream_raw)
+        self.lib.call(
+            q.data_ptr(),
+            v.data_ptr(),
+            g.data_ptr(),
+            A.data_ptr(),
+            h.data_ptr(),
+            msk.data_ptr(),
+            wp[0],
+            wp[1],
+            wp[2],
+            wp[3],
+            o.data_ptr(),
+            self.stream_raw,
+        )
         return o
 
 
@@ -1229,3 +1261,29 @@ __all__ = [
     "fla_chunk_o_kernel",
     "PASS_CONFIGS",
 ]
+
+
+if __name__ == "__main__":
+    # Smoke entry (the CI legacy runner executes this file with `python`):
+    # L0-gate shape, output-shape/finite checks, "Test Passed!" on success.
+    # Numerical accuracy is covered by test_example_fla_chunk_o.py
+    # (PyTorch golden).
+    import torch_npu  # noqa: F401  (registers .npu() on torch)
+
+    tilelang.cache.clear_cache()
+    B, S, H, DK, DV, CS = 1, 128, 2, 64, 64, 64
+
+    gen = torch.Generator().manual_seed(42)
+    q = torch.randn(B, S, H, DK, generator=gen)
+    v = torch.randn(B, S, H, DV, generator=gen)
+    g = torch.randn(B, S, H, DK, generator=gen)
+    A = torch.randn(B, S, H, CS, generator=gen)
+    h = torch.randn(B, S // CS, H, DK, DV, generator=gen)
+    q, v, A, h = (t.to(torch.bfloat16) for t in (q, v, A, h))
+
+    o = fla_chunk_o(q.npu(), v.npu(), g.npu(), A.npu(), h.npu())
+    torch.npu.synchronize()
+    assert o.shape == (B, S, H, DV) and o.dtype is torch.bfloat16
+    assert torch.isfinite(o.float()).all().item(), "o contains NaN/Inf"
+    print(f"[SMOKE_PASS] fla_chunk_o B={B} S={S} H={H} DK={DK} DV={DV} chunk={CS} bf16 (gate fp32)")
+    print("Test Passed!")

@@ -73,9 +73,7 @@ def check_output(name, out, ref, atol, rtol, max_abs_limit, required_ratio):
     abs_err = (y_cpu[m] - ref_cpu[m]).abs()
     ratio = (abs_err <= (atol + rtol * ref_cpu[m].abs())).float().mean().item()
     max_abs = abs_err.max().item()
-    assert ratio >= required_ratio and max_abs <= max_abs_limit, (
-        f"{name} precision fail: ratio={ratio:.4f} max_abs={max_abs:.3e}"
-    )
+    assert ratio >= required_ratio and max_abs <= max_abs_limit, f"{name} precision fail: ratio={ratio:.4f} max_abs={max_abs:.3e}"
     print(f"Test pass! {name}: matched_ratio={ratio:.4f} max_abs={max_abs:.3e}")
 
 
