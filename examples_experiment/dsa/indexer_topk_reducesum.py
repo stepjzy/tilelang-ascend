@@ -78,7 +78,10 @@ Implementation notes (each item is a platform constraint):
      max(2*topk, 64), PS = max(topk, 32)) and pre-filled with -inf.
   6. IndexQ / Weights are declared flat ([S*H, D] / [S*H]) and the cached
      launcher applies zero-copy host-side views (T.copy structural
-     equality forbids the [S, H, D] row-segment form).
+     equality forbids the [S, H, D] row-segment form). Inputs must be
+     contiguous: non-contiguous tensors are rejected before the view —
+     an implicit reshape copy dies with the marshal frame, so its storage
+     could be reused before the (cached) launch reads it.
   7. gemm_v0 is instantiated with a host-computed kL0Size (_pick_kl0_size):
      the default 128 overflows L0A for M = QG*heads = 512 — the A slot
      M * kL0Size * 2B must fit 64KB for a single (N, K) step or 32KB once
@@ -107,8 +110,11 @@ Supported domain (host-validated): q/w/k bfloat16; heads % 8 == 0 and
 <= 64; dim % 16 == 0; topk a power of two in [16, 1024] and <= every
 segment length; the fast path additionally requires max_seg_len <= 4096;
 the generic path covers any segment length (topk <= 1024, CH =
-max(1024, topk)). Configurations whose exact UB model exceeds the 192KB
-budget are rejected with ValueError (see _fast_gate_ok / _generic_gate_ok).
+max(1024, topk)). Configurations whose exact UB model exceeds the 196352B
+budget or whose Cube-side L1 staging (Q_l1 + K_l1 + ack) exceeds the
+524032B L1 pool are rejected with ValueError (see _fast_gate_ok /
+_generic_gate_ok); the host first demotes the group tier to fit (fast:
+QG 8 -> 4; generic: 8 -> 4 -> 2).
 """
 
 import ctypes
@@ -141,7 +147,8 @@ _pass_configs = {
     tilelang.PassConfigKey.TL_ASCEND_MEMORY_PLANNING: True,
 }
 
-_UB_CAPACITY = 196352  # 192KB minus a planner safety margin
+_UB_CAPACITY = 196352  # A2/A3 UB pool (codegen ASCEND_A2A3_UB_SIZE)
+_L1_CAPACITY = 524032  # A2/A3 per-AI-Core L1 pool (codegen ASCEND_A2A3_L1_SIZE)
 _L0C_CAPACITY = 128 * 1024
 _BN = 32  # K-block width (GEMM N)
 _ACK_PER_AIV = 16  # fp32 heartbeat elements per AIV slot (64B, 32B-aligned)
@@ -167,6 +174,14 @@ class _CachedLauncher:
     still the right ones for these very tensors. Any miss (fresh tensors,
     changed arg count, explicit stream) re-marshals through the same cheap
     path; non-tensor args or a missing adapter fall back to the stock call.
+
+    Inputs must be contiguous: the view spec may only produce zero-copy
+    views of the caller's storage. A reshape of a non-contiguous tensor
+    materializes a temporary copy that dies with the marshal frame (the
+    cache slot retains only the original args, so the marshaled pointer
+    would dangle once the storage is reused), and a retained copy would go
+    stale on in-place mutation — non-contiguous tensors are therefore
+    rejected before any view is applied.
     """
 
     __slots__ = (
@@ -209,13 +224,19 @@ class _CachedLauncher:
 
     def _marshal(self, args):
         ad = self._adapter
+        # Contiguity is checked on the caller-side tensors BEFORE the view
+        # spec: a reshape of a non-contiguous input materializes a temporary
+        # copy whose storage dies with this frame, while the cache slot (and
+        # this launch) only see the raw pointer — non-contiguous inputs are
+        # rejected instead (call .contiguous() at the source).
+        for t in args:
+            if isinstance(t, torch.Tensor) and not t.is_contiguous():
+                raise ValueError("kernel tensors must be contiguous")
         tensors = [self._apply_view(t, self._view_spec.get(i, "")) if isinstance(t, torch.Tensor) else t for i, t in enumerate(args)]
         c_args = []
         for t in tensors:
             if not isinstance(t, torch.Tensor):
                 return None
-            if not t.is_contiguous():
-                raise ValueError("kernel tensors must be contiguous")
             c_args.append(ctypes.c_void_p(t.data_ptr()))
         for _, (bidx, sidx) in ad.dynamic_symbolic_map.items():
             c_args.append(ctypes.c_int64(int(tensors[bidx].shape[sidx])))
@@ -247,7 +268,11 @@ class _CachedLauncher:
                 self._dev = dev
                 self._lib.call(*c_args)
                 return
-        # full validating fallback (also applies the view spec)
+        # full validating fallback (also applies the view spec; same
+        # pre-view contiguity contract as _marshal)
+        for t in args:
+            if isinstance(t, torch.Tensor) and not t.is_contiguous():
+                raise ValueError("kernel tensors must be contiguous")
         args2 = tuple(self._apply_view(t, self._view_spec.get(i, "")) if isinstance(t, torch.Tensor) else t for i, t in enumerate(args))
         self._kernel(*args2)
 
@@ -293,7 +318,8 @@ def tl_indexer_topk_reducesum_fast(
         topk: selected positions (power of two, 16 <= topk <= CAP).
         CAP: score_row width, power of two in {512, 1024, 2048, 4096};
             the host guarantees CAP >= max segment length (dispatch contract).
-        QG: tokens per group (GEMM M = QG*heads; 8 for CAP<=2048, 4 for 4096).
+        QG: tokens per group (GEMM M = QG*heads; host tiering picks 8
+            whenever CAP <= 2048 and the UB/L1 budgets fit, else 4).
             Each AIV-vid of the group's block owns the contiguous token half
             [vid*QG//2, (vid+1)*QG//2).
         BN: K-block width (GEMM N).
@@ -1123,14 +1149,19 @@ def _detect_dispatch(offsets, off_list=None):
     return "fast" if _max_seg_len(offsets, off_list) <= 4096 else "generic"
 
 
-def _fast_gate_ok(heads, topk, CAP, QG, BN=32):
-    """Host mirror of the fast-path domain + exact UB/L0A budget model.
+def _fast_gate_ok(heads, dim, topk, CAP, QG, BN=32):
+    """Host mirror of the fast-path domain + exact UB/L1/L0A budget model.
 
     UB model is liveness-aware and per-AIV (MIX_AIC_1_2: each Vector core
     owns QG//2 tokens of every group): the K-block-phase buffers
     (relay/vector chain) and the topk-phase buffers (topk_src/dst/softmax
     chain/auto tmp) have disjoint live ranges inside one task; score_row
-    persists across both. The L0A model mirrors _pick_kl0_size.
+    persists across both. The L0A model mirrors _pick_kl0_size. The L1
+    model bounds the Cube-side staging — Q_l1 [QG*heads, dim] + K_l1
+    [BN, dim] bf16 + the fp32 ack heartbeat, simultaneously live in the
+    K-block loop — by the 524032B L1 pool (the memory planner packs them
+    disjointly with no overflow check; heads=64 x dim=512 x QG=8 alone
+    needs 544KiB).
     """
     if not (heads % 8 == 0 and heads <= 64):
         return False
@@ -1145,6 +1176,8 @@ def _fast_gate_ok(heads, topk, CAP, QG, BN=32):
         return False  # AIV-vid token-half split + half-token chain fusion
     # (L0A feasibility with the actual dim is enforced in _run_fast via
     #  _pick_kl0_size; here M = QG*heads <= 512 always has a candidate.)
+    if (QG * heads + BN) * dim * 2 + _ACK_TOTAL * 4 > _L1_CAPACITY:
+        return False
     qg2_h = (QG // 2) * heads
     topk_a = max(topk, 64)
     k_phase = (
@@ -1176,8 +1209,9 @@ def _fast_gate_ok(heads, topk, CAP, QG, BN=32):
     return total < _UB_CAPACITY
 
 
-def _generic_gate_ok(heads, topk, CH=1024, QG=8, BN=32):
-    """Host mirror of the generic-path domain + exact per-AIV UB budget model."""
+def _generic_gate_ok(heads, dim, topk, CH=1024, QG=8, BN=32):
+    """Host mirror of the generic-path domain + exact per-AIV UB / Cube L1
+    budget model (the L1 staging bound is identical to the fast gate)."""
     if not (heads % 8 == 0 and heads <= 64):
         return False
     if topk != _next_pow2(topk) or topk < 16 or topk > 1024:
@@ -1187,6 +1221,8 @@ def _generic_gate_ok(heads, topk, CH=1024, QG=8, BN=32):
         return False
     qg_h = QG * heads
     if qg_h * BN * 4 > _L0C_CAPACITY:
+        return False
+    if (QG * heads + BN) * dim * 2 + _ACK_TOTAL * 4 > _L1_CAPACITY:
         return False
     qg2_h = (QG // 2) * heads
     topk_a = max(topk, 64)
@@ -1260,14 +1296,18 @@ def _run_fast(q, weights, k, topk, offsets, token_indices, off_list, backend="as
     grid_size = _get_cube_core_num()
     max_seg = _max_seg_len(offsets, off_list)
     CAP = max(512, _next_pow2(max_seg))
-    # QG tier: 8 tokens/group whenever the UB model fits, else 4 (the fused
-    # [BN, QG2H] fp32 pair overflows at CAP=2048 x topk=1024 with QG=8)
+    # QG tier: 8 tokens/group whenever the UB and L1 models fit, else 4 (the
+    # fused [BN, QG2H] fp32 pair overflows the UB model at CAP=2048 x
+    # topk=1024 with QG=8; the Q/K L1 staging overflows at heads=64 x
+    # dim=512 with QG=8)
     QG = 8 if CAP <= 2048 else 4
-    if CAP <= 2048 and not _fast_gate_ok(heads, topk, CAP, QG):
+    if QG == 8 and not _fast_gate_ok(heads, dim, topk, CAP, QG):
         QG = 4
-    if not _fast_gate_ok(heads, topk, CAP, QG):
+    if not _fast_gate_ok(heads, dim, topk, CAP, QG):
         raise ValueError(
-            f"fast path out of domain (heads={heads}, topk={topk}, CAP={CAP}, QG={QG}); reduce topk or use a shorter max segment"
+            f"fast path infeasible (heads={heads}, dim={dim}, topk={topk}, CAP={CAP}, QG={QG}): "
+            "no QG tier in (8, 4) fits the UB/L1 budgets — reduce topk, reduce heads*dim, "
+            "use a shorter max segment, or dispatch='generic'"
         )
     if backend == "pto" and CAP > 2048:
         # the pto fast path at CAP=4096 exceeds the 192KB UB budget (the
@@ -1326,9 +1366,21 @@ def _run_generic(q, weights, k, topk, offsets, token_indices, off_list, backend=
     max_seg = _max_seg_len(offsets, off_list)
     CH = max(1024, _next_pow2(topk))
     NSEG = (max_seg + CH - 1) // CH
+    # QG tier: 8 tokens/group whenever the UB and L1 models fit, else 4,
+    # else 2 (the Q/K L1 staging overflows at heads=64 x dim=512 with QG=8;
+    # the generic body accepts any even QG, so QG=2 also serves as the
+    # rescue tier for dims the fast path cannot stage)
     QG = 8
-    if not _generic_gate_ok(heads, topk, CH, QG):
-        raise ValueError(f"generic path out of domain (heads={heads}, topk={topk}, CH={CH}); topk must be a power of two in [16, 1024]")
+    if not _generic_gate_ok(heads, dim, topk, CH, QG):
+        QG = 4
+        if not _generic_gate_ok(heads, dim, topk, CH, QG):
+            QG = 2
+    if not _generic_gate_ok(heads, dim, topk, CH, QG):
+        raise ValueError(
+            f"generic path infeasible (heads={heads}, dim={dim}, topk={topk}, CH={CH}, QG={QG}): "
+            "topk must be a power of two in [16, 1024] and no QG tier in (8, 4, 2) fits "
+            "the UB/L1 budgets — reduce topk or heads*dim"
+        )
 
     group_table = _cached_group_table(offsets, off_list, QG)
     kl0 = _pick_kl0_size(QG * heads, dim)
@@ -1404,12 +1456,22 @@ def indexer_topk_reducesum_interface(
 
     Returns:
         (topk_indices [seq_len, topk] int32, topk_score [seq_len, topk] fp32).
+
+    All tensor inputs must be contiguous (call ``.contiguous()`` on sliced
+    or permuted views): the cached launch path marshals raw data pointers
+    and cannot retain an implicit reshape copy across the launch.
     """
     if q.dim() != 3 or weights.dim() != 2 or k.dim() != 2:
         raise ValueError(f"rank mismatch: q {tuple(q.shape)}, w {tuple(weights.shape)}, k {tuple(k.shape)}")
     seq_len, heads, dim = q.shape
     if weights.shape != (seq_len, heads) or k.shape != (seq_len, dim):
         raise ValueError(f"shape mismatch: q {tuple(q.shape)}, w {tuple(weights.shape)}, k {tuple(k.shape)}")
+    if not (q.is_contiguous() and weights.is_contiguous() and k.is_contiguous() and offsets.is_contiguous()):
+        raise ValueError(
+            "q/weights/k/offsets must be contiguous (call .contiguous() on non-contiguous "
+            f"views), got q={q.is_contiguous()}, weights={weights.is_contiguous()}, "
+            f"k={k.is_contiguous()}, offsets={offsets.is_contiguous()}"
+        )
     if dtype not in ("bfloat16", "bf16", "float32"):
         # the reference passes T.bfloat16 (== "bfloat16"); accept the
         # bfloat16 family only — the precision path is fixed bf16
