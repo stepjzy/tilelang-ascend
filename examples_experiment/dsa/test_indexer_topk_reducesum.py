@@ -181,17 +181,13 @@ def test_indexer_topk_reducesum_l1_dim512_fast() -> None:
     """heads=64 x dim=512 (S=2048): the 8-token group tier overflows the L1
     pool (544KiB); the host demotes to QG=4 and the fast path still meets
     the golden tolerance."""
-    assert run_golden_kernel(S=2048, H=64, D=512, topk=64), (
-        "output exceeds tolerance on the L1-demoted fast path (QG=4)"
-    )
+    assert run_golden_kernel(S=2048, H=64, D=512, topk=64), "output exceeds tolerance on the L1-demoted fast path (QG=4)"
 
 
 def test_indexer_topk_reducesum_l1_dim512_generic() -> None:
     """heads=64 x dim=512 on the generic path (S=4097 > 4096): the same L1
     demotion to QG=4 applies."""
-    assert run_golden_kernel(S=4097, H=64, D=512, topk=64), (
-        "output exceeds tolerance on the L1-demoted generic path (QG=4)"
-    )
+    assert run_golden_kernel(S=4097, H=64, D=512, topk=64), "output exceeds tolerance on the L1-demoted generic path (QG=4)"
 
 
 def test_fast_path_rejects_l1_infeasible_dim() -> None:
@@ -240,9 +236,7 @@ def test_rejects_non_contiguous_inputs() -> None:
     with pytest.raises(ValueError, match="contiguous"):
         indexer_topk_reducesum_interface(q, weights, k, topk, offsets)
     # the explicit .contiguous() materialization is accepted
-    topk_indices, topk_score = indexer_topk_reducesum_interface(
-        q.contiguous(), weights, k, topk, offsets
-    )
+    topk_indices, topk_score = indexer_topk_reducesum_interface(q.contiguous(), weights, k, topk, offsets)
     assert topk_indices.shape == (S, topk) and topk_score.shape == (S, topk)
 
 
