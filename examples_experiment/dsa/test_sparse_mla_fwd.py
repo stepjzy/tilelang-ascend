@@ -5,7 +5,7 @@
 import torch
 import torch_npu  # noqa: F401  (registers the NPU device)
 
-from sparse_mla_fwd import sparse_mla_fwd_interface
+from sparse_mla_fwd import prepare_token_indices, sparse_mla_fwd_interface
 
 
 def calculate_tensor_similarity(x, y, name="tensor"):
@@ -163,7 +163,97 @@ def test_sparse_mla_fwd(
     print("fwd tflops = ", (B * S * (DQK + DV) * topk * 2 * H) / (ms * 1e-3) / 1e12)
 
 
+def _build_indices(S, HKV, topk, offsets):
+    """Per-row in-segment top-k indices (main-test construction; unfilled
+    slots stay at the out-of-range S fill and are masked away)."""
+    indices = torch.full((S, HKV, topk), S, dtype=torch.int32, device=offsets.device)
+    for i in range(offsets.shape[0] - 1):
+        seq_len = (offsets[i + 1] - offsets[i]).item()
+        assert seq_len >= topk
+        for t in range(seq_len):
+            for h in range(HKV):
+                i_i = torch.randperm(max(1, t))[:topk]
+                indices[offsets[i] + t, h, : len(i_i)] = i_i
+    return indices
+
+
+def test_offsets_inplace_update_invalidates_cache():
+    """PR review regression: prepare_token_indices cached by object identity
+    only, so an in-place cu_seqlens update reused the stale segment mapping
+    (wrong gather / causal mask / output)."""
+    torch.random.manual_seed(0)
+    S, H, HKV, DQK, topk = 256, 128, 1, 576, 64
+    offsets = torch.tensor([0, 128, 256], dtype=torch.int32, device="npu")
+
+    # unit: same object -> cache hit; in-place mutation -> invalidation
+    ti_a = prepare_token_indices(offsets)
+    ti_b = prepare_token_indices(offsets)
+    assert ti_a is ti_b, "steady-state call on the same tensor must hit the cache"
+    offsets.copy_(torch.tensor([0, 64, 256], dtype=torch.int32, device="npu"))
+    ti_c = prepare_token_indices(offsets)
+    assert ti_c is not ti_a, "in-place cu_seqlens update must invalidate the cache"
+    ti_c_list = ti_c.cpu().tolist()
+    assert ti_c_list[64] == [1, 0] and ti_c_list[128] == [1, 64], "mapping must follow the NEW offsets"
+    offsets.copy_(torch.tensor([0, 128, 256], dtype=torch.int32, device="npu"))
+
+    # end-to-end: kernel output after an in-place update must match the
+    # golden computed from the NEW offsets
+    q = torch.randn((S, H, DQK), dtype=torch.bfloat16, device="npu")
+    kv = torch.randn((S, HKV, DQK), dtype=torch.bfloat16, device="npu")
+    indices = _build_indices(S, HKV, topk, offsets)
+    sparse_mla_fwd_interface(q, kv, indices, offsets, block_I=64)  # warm the cache
+    offsets.copy_(torch.tensor([0, 64, 256], dtype=torch.int32, device="npu"))
+    indices = _build_indices(S, HKV, topk, offsets)
+    tl_out, _ = sparse_mla_fwd_interface(q, kv, indices, offsets, block_I=64)
+    ref_out = ref_sparse_mla_fwd_interface(q, kv, indices, offsets)
+    assert_tensors_similar(tl_out, ref_out, eps=1e-2, name="out-after-inplace-offsets")
+    print("in-place cu_seqlens cache invalidation passed")
+
+
+def test_head_kv_over_128_rejected():
+    """PR review regression: H=256/G=1 passed the host checks and entered
+    the portable path whose acc_o_all alone needs 262,144 B of UB (196,352 B
+    available). It must now be rejected up front with a clear error."""
+    q = torch.zeros((8, 256, 576), dtype=torch.bfloat16, device="npu")
+    kv = torch.zeros((8, 1, 576), dtype=torch.bfloat16, device="npu")
+    indices = torch.zeros((8, 1, 256), dtype=torch.int32, device="npu")
+    offsets = torch.tensor([0, 4, 8], dtype=torch.int32, device="npu")
+    raised = False
+    try:
+        sparse_mla_fwd_interface(q, kv, indices, offsets)
+    except AssertionError as e:
+        raised = True
+        assert "head_kv=256" in str(e), f"unexpected rejection message: {e}"
+    assert raised, "H=256/G=1 must be rejected (portable kernel UB budget)"
+    print("head_kv > 128 domain rejection passed")
+
+
+def test_extreme_finite_inputs_no_nan(target="ascendc", topk=256):
+    """PR review regression: the -(2**30) softmax floor sat above legal bf16
+    extremes (Q=-8192/KV=8192 with the default scale scores ~-1.6e9), so
+    every exp underflowed and the epilogue divided 0/0 -> NaN."""
+    S, H, HKV, DQK = 544, 128, 1, 576
+    torch.random.manual_seed(0)
+    q = torch.full((S, H, DQK), -8192.0, dtype=torch.bfloat16, device="npu")
+    kv = torch.full((S, HKV, DQK), 8192.0, dtype=torch.bfloat16, device="npu")
+    offsets = torch.tensor([0, 288, 544], dtype=torch.int32, device="npu")
+    indices = _build_indices(S, HKV, topk, offsets)
+    tl_out, tl_lse = sparse_mla_fwd_interface(q, kv, indices, offsets, block_I=64, target=target)
+    assert not torch.isnan(tl_out.float()).any(), "Output must stay finite for legal bf16 extremes"
+    assert not torch.isnan(tl_lse).any(), "Lse must stay finite for legal bf16 extremes"
+    ref_out = ref_sparse_mla_fwd_interface(q, kv, indices, offsets)
+    assert_tensors_similar(tl_out, ref_out, eps=1e-2, name=f"out-extreme-{target}-topk{topk}")
+    print(f"extreme finite inputs ({target}, topk={topk}) passed")
+
+
 if __name__ == "__main__":
+    # PR review round-1 regressions: cache invalidation / domain rejection /
+    # extreme-input NaN — all three dispatch variants of the softmax fix.
+    test_offsets_inplace_update_invalidates_cache()
+    test_head_kv_over_128_rejected()
+    test_extreme_finite_inputs_no_nan(target="ascendc", topk=256)  # fast path
+    test_extreme_finite_inputs_no_nan(target="ascendc", topk=192)  # portable (ascendc)
+    test_extreme_finite_inputs_no_nan(target="pto", topk=256)  # portable (pto)
     test_sparse_mla_fwd(
         B=1,
         S=4096,

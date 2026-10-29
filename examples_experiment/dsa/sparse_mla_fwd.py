@@ -20,7 +20,9 @@ Semantics (kernel-side contract):
 
 Two kernel paths behind one host interface:
   * portable (tl_sparse_mla_fwd): Developer mode with full AUTO pass_configs,
-    dual backend (target="ascendc" | "pto"); covers the whole support domain.
+    dual backend (target="ascendc" | "pto"); covers the whole support domain
+    (head_kv = heads // kv_group <= 128, bounded by the portable kernel's UB
+    budget — see _derived_head_layout).
   * fast (tl_sparse_mla_fwd_fast): Expert mode (manual T.Scope("C")/("V"),
     manual intra-core flags + cross-flag ring protocol), ascendc only; a
     two-pass BI=256 ring-pipelined kernel restricted to (dim, tail_dim) =
@@ -58,13 +60,28 @@ def _derived_head_layout(heads, kv_group):
     """Head layout shared by builder and host (single source of truth).
 
     Support domain: head_kv = heads // kv_group with (16 <= head_kv <= 64 and
-    power of 2) or head_kv % 64 == 0; padded_H != head_kv only allowed for
-    kv_group == 1.
+    power of 2) or head_kv % 64 == 0, bounded by head_kv <= 128 (portable
+    kernel UB capacity, see the assert below); padded_H != head_kv only
+    allowed for kv_group == 1.
     """
     head_kv = heads // kv_group
     assert kv_group >= 1 and heads % kv_group == 0, f"heads={heads} must be divisible by kv_group={kv_group}"
     assert (16 <= head_kv <= 64 and head_kv == tilelang.math.next_power_of_2(head_kv)) or head_kv % 64 == 0, (
         f"head_kv={head_kv} out of supported domain: need (16<=head_kv<=64 and power of 2) or head_kv % 64 == 0"
+    )
+    # UB capacity bound: the portable kernel's fp32 output accumulator
+    # acc_o_all [N_SEG, v_block, DS] spans N_SEG * DS = dim = 512 columns,
+    # i.e. 2 KB per Hseg head row, and stays live across the whole softmax
+    # loop. head_kv = 128 (v_block = 64 -> 128 KB, the shipped main config)
+    # is the largest layout that fits the ~192 KB AIV UB budget together
+    # with the softmax scratch; head_kv = 192 needs 192 KB for acc_o_all
+    # alone and head_kv = 256 needs 256 KB (262,144 B > 196,352 B usable
+    # UB). Reject up front with a clear message instead of letting the
+    # build/launch fail (or misbehave) deep inside the kernel.
+    assert head_kv <= 128, (
+        f"head_kv={head_kv} (heads={heads}, kv_group={kv_group}) exceeds the portable kernel's UB budget: "
+        f"acc_o_all alone needs {1024 * head_kv} B of UB, over the 196352 B available per AIV; "
+        f"use kv_group > 1 to shrink head_kv, or split heads across calls"
     )
     padded_H = max(tilelang.math.next_power_of_2(head_kv), 16)
     if padded_H != head_kv:
@@ -215,10 +232,18 @@ def _make_jit_builder(target):
                     T.copy(Q[s_row, H0 : H0 + Hseg, dim:DDT], qt_l1)
 
                     # ---- [V] softmax state init (per task) ----
+                    # m floor = -BIGC/2: low enough to sit BELOW every finite
+                    # score of practical bf16 inputs (a -2**30 floor sits ABOVE
+                    # legal extremes, e.g. Q=-8192/KV=8192 with the default
+                    # scale gives scores ~-1.6e9, which made every exp
+                    # underflow and the epilogue divide 0/0 -> NaN), yet high
+                    # enough that all-invalid rows' masked scores (-BIGC)
+                    # still underflow to 0 against it. A finite floor also
+                    # keeps alpha = exp(m_prev - m_i) free of -inf - -inf NaN.
                     for d in range(N_SEG):
                         T.tile.fill(acc_o_all[d, :, :], 0.0)
                     T.tile.fill(sumexp, 0.0)
-                    T.tile.fill(m_i, -(2.0**30))  # avoid -inf - inf NaN
+                    T.tile.fill(m_i, -(BIGC * 0.5))
 
                     for i in T.serial(NI):
                         # ---- [V] indices block + mask arithmetic chain ----
@@ -418,9 +443,19 @@ def _make_jit_builder(target):
                             T.tile.add(acc_o_all[d, :, :], acc_o_all[d, :, :], acc_s_ub)
 
                     # ---- [V tail] normalize + Lse + writeback ----
+                    # Empty-row guard: a row whose top-k slots are ALL
+                    # invalid has sumexp == 0 (its masked scores -BIGC all
+                    # underflow against the m floor above). Divide by
+                    # max(sumexp, 1) so such rows emit Output = 0 instead of
+                    # 0/0 NaN; for non-empty rows sumexp >= 1 (the global-max
+                    # slot contributes exp(0) = 1), so the clamp is an exact
+                    # no-op. m_prev is dead past the NI loop — reuse it as
+                    # the safe-denominator buffer. Lse below still uses the
+                    # raw sumexp: ln(0) = -inf gives empty rows -inf.
+                    T.tile.max(m_prev, sumexp, T.float32(1.0))
                     for d in range(N_SEG):
                         for h in range(v_block):
-                            T.tile.div(acc_o_all[d, h, :], acc_o_all[d, h, :], sumexp[h])
+                            T.tile.div(acc_o_all[d, h, :], acc_o_all[d, h, :], m_prev[h])
                     T.tile.ln(sumexp, sumexp)
                     T.tile.add(sumexp, sumexp, m_i)  # Lse = ln(sumexp) + m_i
                     for d in range(N_SEG):
@@ -488,20 +523,36 @@ def tl_sparse_mla_fwd(
 
 
 def _tensor_cache(fn):
-    """Single-entry cache keyed on input tensor identity.
+    """Single-entry cache keyed on input tensor identity + mutation version.
 
     Keeps prepare_token_indices' CPU->H2D copy out of steady-state benchmark
-    loops.
+    loops. Identity alone is NOT a valid key: cu_seqlens updated in place
+    (offsets.copy_(...), offsets[1] = ...) keeps the same Python object while
+    its content changes, and a stale TokenIndices would silently mix the old
+    segment mapping with the new boundaries (wrong gather, wrong causal mask,
+    wrong output). torch bumps a per-storage version counter on every in-place
+    mutation, so (identity, _version) catches those updates with pure
+    metadata checks — no device sync, so the steady-state fast path is kept.
+    Residual blind spot: writes through ``tensor.data`` bypass the version
+    counter (autograd escape hatch); pass a fresh tensor (or use regular
+    in-place ops) when mutating cu_seqlens that way.
     """
     last_args = None
+    last_versions = None
     last_result = None
 
     def wrapper(*args):
-        nonlocal last_args, last_result
-        if last_args is not None and len(args) == len(last_args) and all(a is b for a, b in zip(args, last_args)):
+        nonlocal last_args, last_versions, last_result
+        versions = tuple(getattr(a, "_version", None) for a in args)
+        if (
+            last_args is not None
+            and len(args) == len(last_args)
+            and all(a is b for a, b in zip(args, last_args))
+            and versions == last_versions
+        ):
             return last_result
         result = fn(*args)
-        last_args, last_result = args, result
+        last_args, last_versions, last_result = args, versions, result
         return result
 
     return wrapper
@@ -562,7 +613,9 @@ def sparse_mla_fwd_interface(
     """Host entry (main-repo signature compatible).
 
     Args:
-        q: [Sigma S, heads, dim+tail_dim] bfloat16 (NPU)
+        q: [Sigma S, heads, dim+tail_dim] bfloat16 (NPU); head_kv =
+            heads // kv_group must satisfy the kernel domain, in particular
+            head_kv <= 128 (portable-path UB budget; see _derived_head_layout)
         kv: [Sigma S_kv, kv_group, dim+tail_dim] bfloat16 (NPU)
         indices: [Sigma S, kv_group, topk] int32 (NPU), values in {-1} U int32
             (out-of-range clamped for addressing, contribution masked to 0)
@@ -696,9 +749,12 @@ def sparse_mla_fwd_interface(
 # chain keeps V at most 2 blocks ahead of C's QK consumption, so a 2-id
 # set/wait alternation covers any ring depth.
 #
-# All-invalid-row corner: the -(2**30) m_fin floor sits above -BIGC (1e30),
-# so P = exp(-BIGC + 2**30) still underflows to 0 and the epilogue divides
-# 0/0 -> NaN/-inf.
+# All-invalid-row corner: the m_fin floor -BIGC/2 sits below every finite
+# score of practical bf16 inputs (a -2**30 floor would sit ABOVE legal
+# extremes like Q=-8192/KV=8192 scores ~-1.6e9 and NaN the epilogue), yet
+# above -BIGC, so all-invalid rows' masked scores still underflow to 0 and
+# sumexp stays 0; the epilogue's max(sumexp, 1) guard then emits Output = 0
+# / Lse = -inf instead of 0/0 -> NaN.
 # ============================================================================
 
 
@@ -1031,8 +1087,10 @@ def tl_sparse_mla_fwd_fast(
                         s_row_n = T.min(pid_n % seq_len, seq_len - 1)
                         b_n = TokenIndices[s_row_n, 0]
                         bos_n = Offsets[b_n]
-                        # state init (m_fin floor avoids -inf - inf NaN)
-                        T.tile.fill(m_fin, -(2.0**30))
+                        # state init: m_fin floor = -BIGC/2 (below every
+                        # finite practical score, above -BIGC; finite floor
+                        # also avoids -inf - -inf NaN — see section header)
+                        T.tile.fill(m_fin, -(BIGC * 0.5))
                         T.tile.fill(sumexp, 0.0)
                         # ---- pass 1: NI-block m_final reduction ----
                         # (each block's reduction is preceded by the
@@ -1237,6 +1295,15 @@ def tl_sparse_mla_fwd_fast(
                         # pass 2 (both bands, both M-slices flushed).
                         T.wait_cross_flag(F3_BASE + 0)
                         T.wait_cross_flag(F3_BASE + 1)
+                        # Empty-row guard: all-invalid rows have sumexp == 0
+                        # (masked scores -BIGC underflow against the m_fin
+                        # floor); divide by max(sumexp, 1) to emit zeros
+                        # instead of 0/0 NaN. Non-empty rows have sumexp >= 1
+                        # (global-max slot -> exp(0) = 1), so the clamp is an
+                        # exact no-op. sumexp_i is dead past pass 2 (rowsum
+                        # scratch) — reuse it as the denominator buffer. Lse
+                        # below still uses raw sumexp (ln(0) = -inf).
+                        T.tile.max(sumexp_i, sumexp, T.float32(1.0))
                         for s in range(N_SEG):
                             # s_ub MTE2 write vs prior V readers (pass-2
                             # exp/store chain)
@@ -1255,7 +1322,7 @@ def tl_sparse_mla_fwd_fast(
                             # per-row /sumexp (per-task 1/8 frequency, not
                             # worth a broadcast chain)
                             for h in range(V_BLOCK):
-                                T.tile.div(s_ub[h, :], s_ub[h, :], sumexp[h])
+                                T.tile.div(s_ub[h, :], s_ub[h, :], sumexp_i[h])
                             for g in range(NGRP):
                                 T.set_flag("mte3", "v", 0)
                                 T.wait_flag("mte3", "v", 0)
