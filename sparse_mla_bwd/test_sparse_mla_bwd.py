@@ -51,7 +51,7 @@ import torch
 import tilelang
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sparse_mla_bwd import sparse_mla_bwd  # noqa: E402
+from sparse_mla_bwd import prepare_token_indices, sparse_mla_bwd  # noqa: E402
 
 try:
     from sparse_mla_fwd import sparse_mla_fwd_interface  # noqa: E402
@@ -738,14 +738,78 @@ def test_sparse_mla_bwd_l1():
             **kwargs,
         )
         n_pass += ok
+    # PR #1928 review regression: consecutive calls with in-place mutated
+    # offsets (host-side cache bug, ascendc leg only)
+    n_pass += test_sparse_mla_bwd_l1_inplace_offsets()
     if n_ref_c:
         print(
-            f"L1: {n_pass}/{len(L1_CASES)} cases passed "
+            f"L1: {n_pass}/{len(L1_CASES) + 1} cases passed "
             f"({n_ref_c} domain-C reference case(s) recorded WARN, non-blocking per §12.2 amend-2)"
         )
     else:
-        print(f"L1: {n_pass}/{len(L1_CASES)} cases passed")
-    return n_pass == len(L1_CASES)
+        print(f"L1: {n_pass}/{len(L1_CASES) + 1} cases passed")
+    return n_pass == len(L1_CASES) + 1
+
+
+def test_sparse_mla_bwd_l1_inplace_offsets():
+    """L1 regression (PR #1928 review): consecutive sparse_mla_bwd calls
+    with the SAME offsets tensor object whose content is updated in place
+    between the calls — the second call must match the golden of the NEW
+    segmentation. Guards the prepare_token_indices single-entry cache
+    (identity-only keying kept the stale (batch, position) mapping against
+    the freshly read offsets -> wrong segment starts and causal boundaries
+    -> wrong dQ/dKV). Host-side regression, so only the ascendc leg runs."""
+
+    # unit level: the cached (batch, position) mapping itself
+    offsets_u = torch.tensor([0, 256, 512], dtype=torch.int32, device="npu")
+    ti = prepare_token_indices(offsets_u)
+    assert ti[128].tolist() == [0, 128]
+    offsets_u[1] = 128  # in-place: [0, 256, 512] -> [0, 128, 512]
+    ti = prepare_token_indices(offsets_u)
+    assert ti[127].tolist() == [0, 127]
+    assert ti[128].tolist() == [1, 0]
+    assert ti[511].tolist() == [1, 383]
+    # a distinct tensor object with equal content stays correct too
+    offsets_u2 = torch.tensor([0, 128, 512], dtype=torch.int32, device="npu")
+    assert prepare_token_indices(offsets_u2)[128].tolist() == [1, 0]
+
+    # operator level: gradients before/after the in-place update
+    S, H, HKV, topk = 512, 16, 1, 128
+    q, kv, do, _, off = make_case_inputs(S, H, HKV, topk, [0, 256, 512], seed=0)
+
+    def rebuild_segmentation(off):
+        # regenerate indices + (o, lse) for the CURRENT offsets content
+        indices = torch.full((S, HKV, topk), S, dtype=torch.int32, device="npu")
+        for i in range(off.shape[0] - 1):
+            seq_len = (off[i + 1] - off[i]).item()
+            assert seq_len >= topk
+            for t in range(seq_len):
+                for h in range(HKV):
+                    i_i = torch.randperm(max(1, t))[:topk]
+                    indices[off[i] + t, h, : len(i_i)] = i_i.to(torch.int32)
+        o = ref_sparse_mla_fwd_interface(q, kv, indices, off)
+        lse = ref_sparse_mla_fwd_lse_slot(q, kv, indices, off)
+        return indices, o, lse
+
+    ok = True
+    for mutate, name in ((False, "before"), (True, "after")):
+        if mutate:
+            off[1] = 128  # in-place update of the SAME tensor object
+        indices, o, lse = rebuild_segmentation(off)
+        tl_dq, tl_dkv = sparse_mla_bwd(q, kv, o, do, indices, lse, off, target="ascendc")
+        ref_dq, ref_dkv, _ = _golden_bwd_with_o(q, kv, do, indices, off)
+        sim_dq = calculate_tensor_similarity(tl_dq.cpu(), ref_dq.cpu(), f"inplace-{name} dq")
+        sim_dkv = calculate_tensor_similarity(tl_dkv.cpu(), ref_dkv.cpu(), f"inplace-{name} dkv")
+        ok_dq, _, _ = mixed_tolerance_check(tl_dq, ref_dq, *BF16_GATE)
+        ok_dkv, _, _ = mixed_tolerance_check(tl_dkv, ref_dkv, *BF16_GATE)
+        gate = (1.0 - sim_dq) <= 1e-4 and (1.0 - sim_dkv) <= 1e-4 and ok_dq and ok_dkv
+        print(
+            f"[L1-inplace-offsets/{name}] dq sim={sim_dq:.6f} | dkv sim={sim_dkv:.6f} | "
+            f"{'[PRECISION_PASS]' if gate else '[PRECISION_FAIL]'}",
+            flush=True,
+        )
+        ok &= gate
+    return ok
 
 
 # ============================================================================

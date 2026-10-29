@@ -1152,19 +1152,43 @@ def tl_sparse_mla_bwd(
 
 
 def _tensor_cache(fn):
-    """Single-entry cache keyed on input tensor identity (ref_gpu/index.py
-    form): keeps prepare_token_indices' CPU build + H2D out of steady-state
-    benchmark loops."""
+    """Single-entry cache keyed on tensor identity + in-place mutation
+    version (ref_gpu/index.py form upgraded): keeps prepare_token_indices'
+    CPU build + H2D out of steady-state benchmark loops. Checking the
+    mutation version in addition to the object identity makes an in-place
+    update of a cached tensor invalidate the cached mapping instead of
+    silently returning the stale one (PR #1928 review: reusing one offsets
+    tensor with content updated [0,256,512] -> [0,128,512] kept the stale
+    (batch, position) mapping, mixing segment starts and causal boundaries
+    -> wrong gradients). The cached args are held alive, so an identity hit
+    always means the very same object (no address-reuse false hits).
+    Caveat: writes through ``tensor.data`` bypass torch's version counter
+    and are not detected.
+
+    (content-keying was measured and rejected: reading the offsets content
+    per call needs a D2H sync, which breaks do_bench's launch pipelining
+    and inflated the measured mean by ~1.0 ms / +3.6% on the 27 ms shape;
+    version counting is sync-free and caught every tracked in-place op in
+    the repro matrix: setitem / copy_ / view writes / no_grad writes.)"""
 
     last_args = None
+    last_versions = None
     last_result = None
 
     def wrapper(*args):
-        nonlocal last_args, last_result
-        if last_args is not None and len(args) == len(last_args) and all(a is b for a, b in zip(args, last_args)):
-            return last_result
+        import torch
+
+        nonlocal last_args, last_versions, last_result
+        if last_args is not None and len(args) == len(last_args):
+            matches = (
+                (a is b and a._version == v) if isinstance(a, torch.Tensor) else (a == b) for a, b, v in zip(args, last_args, last_versions)
+            )
+            if all(matches):
+                return last_result
         result = fn(*args)
-        last_args, last_result = args, result
+        last_args = args
+        last_versions = tuple(a._version if isinstance(a, torch.Tensor) else None for a in args)
+        last_result = result
         return result
 
     return wrapper

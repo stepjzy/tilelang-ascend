@@ -213,3 +213,64 @@
 - rollback: no
 - instrumentation_cleaned: yes（探针为最终代码的正式排空机制，非临时插桩；调试用 /tmp 脚本未入仓）
 - next_hint: Stage 3（1）msprof 对账 §13.7：AIC/AIV 等 flag 占比（>30% 触发 Expert fallback §4.2）+ 逐腿带宽（C MTE2 口径为最大不确定项）；（2）探针排空的流水代价评估——P1a/P1b/P2/P3 每迭代强制 V+MTE3 排空，可能抵消 pair-loop 重叠，需 msprof 定量后考虑合并/弱化（如 P2/P3 合并、probe 条件化）；（3）P 重算向量链（~20 tile ops/块）回归 pst 档的评估需先解决跨分支同步（workspace 化 + flag 预算重排）；（4）L5 bf16 档可在 Stage 3 以域 A 门限复评（当前 ratio 0.965-0.983）
+
+## Review fix — 2026-10-29（PR #1928 review：prepare_token_indices 缓存失效）
+- mode: review_fix（交付后回流，非 Stage 2 attempt；PR #1928 ChaoyangJi review 意见）
+- classification: host_bug（_tensor_cache 只比较对象身份，无 kernel 改动）
+- fail_category: review 反馈的 host 侧缓存正确性缺陷
+- review 意见: 单条目缓存只比较 tensor 对象身份（`a is b`）。复用同一 offsets 并原地改内容
+  （[0,256,512] → [0,128,512]）时缓存仍返回旧 (batch, position) 映射，kernel 结合旧映射
+  读取新 Offsets → 错误分段起点与因果边界 → 跨段 gather/scatter → 错误梯度。建议按内容或
+  mutation version 使缓存失效，并补连续两次调用、原地改 offsets 的测试。
+- 复现（双向证据）:
+  1. 隔离复现（CPU 即可，纯 host 逻辑）：原地改后 token 128 仍映射 (0,128)，正确值 (1,0)；
+  2. 算子级复现（S=512,H=16,HKV=1,topk=128,ascendc）：旧码突变相位 dq similarity
+     diff=9.97e-01（几乎全错，阈值 1e-4）→ 回归测试有效捕获。
+- 修复（最终采用 identity + mutation version）:
+  `_tensor_cache` 命中条件从 `a is b` 升级为 `a is b and a._version == v`（张量参数），
+  强引用持有缓存参数 → 身份命中必为同一对象（无 id 复用假命中）；`tensor.data` 裸写绕过
+  torch version counter，为文档化残留洞（torch autograd 自身也不追踪该写法）。
+- 方案权衡实测（本次最有学习价值的点）:
+  1. 先实现"按内容失效"（`a.detach().cpu().tolist()` 作缓存键）——正确性无洞，但同进程
+     交替 A/B（S=2048,H=64,topk=512，新旧模块同进程共享输入，do_bench warmup=500/rep=1000
+     ×3 轮）实测 28.192 → 29.207 ms，**+1.015 ms / +3.60%**：每调用一次 D2H 同步破坏
+     do_bench 的发射流水掩盖效应，把 ~1ms host 分发间隙暴露进事件计时窗口；
+  2. 改 identity + `_version`（零同步）后同法 A/B：28.765 vs 28.753 ms，delta −0.04%
+     （统计零差异）；主测试（考核 shape）27.399 ms 与 PR 记录基线 27387.6/27211.3 μs 一致；
+  3. 结论：**评测热路径上的 host 侧同步代价不止同步本身——流水掩盖被拆除后，隐藏的 host
+     分发开销会全额计入设备侧事件计时**；缓存键校验必须零同步（version counter），
+     内容读回只适合 miss 路径（fn 本来就读）。
+- `_version` 语义验证矩阵（NPU + CPU 一致）: setitem / copy_ / view 写（跨视图共享计数器）/
+  no_grad 下 setitem 全部正确递增；仅 `.data` 裸写不递增（文档化残留洞）。
+- changes: |
+    仅 sparse_mla_bwd.py 的 `_tensor_cache`（identity+version 键；PR 版与 journal 版同步）：
+    1. PR worktree examples_experiment/dsa/sparse_mla_bwd.py：_tensor_cache 重写；
+    2. PR worktree examples_experiment/dsa/test_sparse_mla_bwd.py：新增
+       test_prepare_token_indices_inplace_mutation（单元级，含异对象同内容用例）+
+       test_sparse_mla_bwd_inplace_offsets_mutation（算子级，S=512,H=16,topk=128，
+       突变前后双相位对照 golden）；__main__ 同步登记；ruff check/format 全过；
+    3. journal 版 test_sparse_mla_bwd.py：新增 test_sparse_mla_bwd_l1_inplace_offsets
+       （并入 L1 计数，ascendc 单腿——纯 host 侧回归）；复用 make_case_inputs/_golden_bwd_with_o
+       与 sim+混合容差双门限判据。
+- 验证（最终态）:
+  1. 单元级：token 128 → (1,0)、边界 127/129/511 逐点断言过；异对象同内容过；
+  2. 算子级（PR 版 + journal 版）：突变前后 dq/dkv sim 均达标（journal 版 before/after
+     dq sim 0.999997 / dkv sim 1.000000 [PRECISION_PASS]）；
+  3. 主测试（S=2048,H=64,topk=512,ascendc）：assert_tensors_similar 过，27.399 ms；
+  4. 旧码反向验证：两个新测试对旧码均 FAIL（单元级断言失败 / 算子级 dq diff=9.97e-01）。
+- error_summary: none（修复后全过；旧码失败为测试有效性的反向验证证据，非缺陷残留）
+- design_error_reason: none
+- rollback: no
+- backup_path: n/a（修复前版本由 -pr 分支 commit 872bbdd1 与 dev-journal git 历史双备份）
+- instrumentation_cleaned: yes（/tmp/opencode 隔离脚本未入仓）
+- next_hint: |
+  1. PR #1928 后续：修复随 -pr 分支推送后，观察 review 线程是否认可 identity+version 方案
+     （领导建议原文"按内容或 mutation version"二选一，version 为零性能代价选项）；
+  2. 若 review 坚持"按内容"：改动点集中在 _tensor_cache 一处，但需同步更新 PR 正文性能数字
+     （+3.6% 计时口径影响已在本次实测中量化，可直接引用）；
+  3. 通用教训：examples 里任何 host 侧缓存（identity 键）若被跨调用复用同一 tensor 且允许
+     原地更新，都应带 version 校验——sparse_mla_fwd 等同结构算子可对照自查。
+- 证据文件: |
+    /tmp/opencode/repro_cache_bug.py（隔离复现：旧码 BUG REPRODUCED / 新码 PASS）
+    /tmp/opencode/old_kernel_test/（旧码 + 新测试：EXPECTED FAILURE，dq diff=9.97e-01）
+    /tmp/opencode/ab_bench.py（同进程交替 A/B：内容键 +3.60% / version 键 −0.04%）
