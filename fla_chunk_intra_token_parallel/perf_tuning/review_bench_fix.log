@@ -1,0 +1,7 @@
+/opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/utils/_path_manager.py:66: UserWarning: Permission mismatch: The owner of /opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/lib/libop_plugin_atb.so does not match.
+  warnings.warn(f"Permission mismatch: The owner of {path} does not match.")
+[bench shape=(1,8192,64,128) cs=64 scs=16]
+  events mean = 1776.5 us  (per-rep: ['2477', '1698', '1704', '1701', '1699', '1691', '1704', '1698', '1697', '1698'] us)
+  loop  mean = 1716.4 us  (30 back-to-back launches)
+  unique IO = 621805568 B -> effective bw 350 GB/s = 27.7% of measured ceiling
+  pure-bandwidth floor @ 1263 GB/s = 492 us

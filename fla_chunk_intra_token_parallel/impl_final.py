@@ -206,17 +206,66 @@ PASS_CONFIGS = {
 }
 
 
+# 910B3 unified buffer per AIV: 192KB. The memory planner pins the
+# produce-side staging, the per-vid operand accumulators and the
+# drain-side staging over the whole task loop (ExtendKillIndex), so the
+# FULL coexistence budget must fit.
+UB_TOTAL_BYTES = 196_352
+
+
+def _ub_bytes(BH_V, SCS, DK, CS):
+    """UB bytes coexisting in the steady state: bf16/fp32 load staging
+    rows, the fp32 operand accumulators (a_agg + b_agg, the BH_V-
+    proportional part) and the fixed scratches/masks/drain staging
+    (AKK_W = max(SCS, 16))."""
+    akk_w = max(SCS, 16)
+    staging = 2 * SCS * DK * 2 + 6 * SCS * DK * 4  # q/k rows + 6 fp32 rows
+    accum = 3 * SCS * BH_V * DK * 4  # a_agg (2*SCS*BH_V) + b_agg (SCS*BH_V)
+    fixed = (
+        SCS * 16 * (2 + 4 + 1 + 4 + 4) + SCS * 4  # beta_h/f, eq_m, beta_sel, j16b, beta_col
+        + 4 * SCS + 4 * 16  # idx + idx16
+        + 4 * SCS * SCS * 2 + SCS * SCS * 2  # i_grid/j_grid + lt_m/slt_m
+        + 2 * SCS * SCS * 4 + 2 * SCS * SCS * 4  # r_ub + r1_m/a_m
+        + SCS * CS * 4 + SCS * akk_w * 4  # aqk_s + akk_s
+        + SCS * CS * 2 + SCS * akk_w * 2  # aqk_h + akk_h
+    )
+    return staging + accum + fixed
+
+
+def _pick_bh(H, SCS, DK, CS):
+    """BH is a performance tiling parameter, not a dispatch predicate:
+    pick the largest supported group that divides H (8 -> 4 -> 2) AND
+    keeps the coexisting UB budget within 192KB (smaller groups shrink
+    the operand accumulators while the staging stays DK-proportional)."""
+    for bh in (8, 4, 2):
+        if H % bh != 0:
+            continue
+        if _ub_bytes(bh // 2, SCS, DK, CS) <= UB_TOTAL_BYTES:
+            return bh
+    return 0
+
+
 def _pick_ggrp(BH, SCS, DK):
-    """Heads per gemm_v0 group: amortize the per-call cube overhead with
-    block-diagonal batching, bounded by the L0A single-K-step budget
-    (fp32 A tile GGRP*2*SCS x kL0Size=128 x 4B <= 64KB) and the L0B/L0C
-    N >= 16 fractal rule (N = GGRP*SCS)."""
-    g = min(BH, 4)
-    while g > 1 and g * 2 * SCS * DK * 4 > 65536:
-        g //= 2
-    need = (16 + SCS - 1) // SCS
-    g = max(g, min(need, BH))
-    return g
+    """Heads per gemm group: amortize the per-call cube overhead with
+    block-diagonal batching. GGRP MUST DIVIDE BH -- the block-diagonal
+    tiling covers the BH heads exactly, and a non-divisor leaves tail
+    heads reading out-of-range gemm groups in o_relay (with inconsistent
+    workspace/L1 row counts). Among the divisors of BH, prefer the
+    largest that satisfies the L0A single-K-step budget (fp32 A tile
+    GGRP*2*SCS x DK x 4B <= 64KB) and the L0B/L0C N >= 16 fractal rule
+    (N = GGRP*SCS)."""
+    for g in (8, 4, 2, 1):
+        if BH % g != 0:
+            continue
+        if g * 2 * SCS * DK * 4 > 65536:
+            continue
+        if g * SCS < 16:
+            continue
+        return g
+    raise ValueError(
+        f"no divisor of BH={BH} satisfies the gemm constraints "
+        f"(L0A budget GGRP*2*SCS*DK*4B <= 64KB and N=GGRP*SCS >= 16) "
+        f"with SCS={SCS}, DK={DK}")
 
 
 @tilelang.jit(out_idx=[-2, -1], workspace_idx=[4, 5, 6], pass_configs=PASS_CONFIGS)
@@ -372,14 +421,21 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(GK[bb, i_ts : i_ts + SCS, h0v + h, :], g2_row)
                 T.tile.cast(q_f_row, q_h_row, "CAST_NONE", SCS * DK)
                 T.tile.cast(k_f_row, k_h_row, "CAST_NONE", SCS * DK)
-                T.tile.mul(g2_row, g2_row, LN2)  # g2 = gk * ln2
-                # E- = exp(g_a - g_j)
+                # E- = exp((g_a - g_j) * ln2): the subtraction runs in the
+                # ORIGINAL log2 domain BEFORE the ln2 scaling -- at large
+                # |g| the scaled values round to the same fp32 (ulp of
+                # |g*ln2| can exceed the gate step, e.g. g ~ -1e8 with a
+                # step of 8) and the decay difference is lost; the
+                # raw-domain difference of adjacent fp32 gates is exact
+                # down to the 1-ulp boundary.
                 T.tile.broadcast(bc_row, g2_row[anc : anc + 1, :], axis=0)
                 T.tile.sub(e, bc_row, g2_row)
+                T.tile.mul(e, e, LN2)
                 T.tile.exp(e, e)
                 T.tile.mul(kgj, k_f_row, e)  # K' = k * E-
-                # E+ = exp(g_i - g_a)
+                # E+ = exp((g_i - g_a) * ln2)
                 T.tile.sub(e, g2_row, bc_row)
+                T.tile.mul(e, e, LN2)
                 T.tile.exp(e, e)
                 T.tile.mul(q_f_row, q_f_row, e)  # Q' = q * E+
                 T.tile.mul(e, k_f_row, e)  # K'' = k * E+
@@ -472,12 +528,13 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(GK[bb1, i_ts1 : i_ts1 + SCS, h0v1 + h, :], g2_row)
                 T.tile.cast(q_f_row, q_h_row, "CAST_NONE", SCS * DK)
                 T.tile.cast(k_f_row, k_h_row, "CAST_NONE", SCS * DK)
-                T.tile.mul(g2_row, g2_row, LN2)
                 T.tile.broadcast(bc_row, g2_row[anc : anc + 1, :], axis=0)
                 T.tile.sub(e, bc_row, g2_row)
+                T.tile.mul(e, e, LN2)
                 T.tile.exp(e, e)
                 T.tile.mul(kgj, k_f_row, e)
                 T.tile.sub(e, g2_row, bc_row)
+                T.tile.mul(e, e, LN2)
                 T.tile.exp(e, e)
                 T.tile.mul(q_f_row, q_f_row, e)
                 T.tile.mul(e, k_f_row, e)
@@ -609,12 +666,13 @@ def fla_chunk_intra_token_parallel_kernel(
                     T.copy(GK[bbp, i_tsp : i_tsp + SCS, h0vp + h, :], g2_row)
                     T.tile.cast(q_f_row, q_h_row, "CAST_NONE", SCS * DK)
                     T.tile.cast(k_f_row, k_h_row, "CAST_NONE", SCS * DK)
-                    T.tile.mul(g2_row, g2_row, LN2)
                     T.tile.broadcast(bc_row, g2_row[anc : anc + 1, :], axis=0)
                     T.tile.sub(e, bc_row, g2_row)
+                    T.tile.mul(e, e, LN2)
                     T.tile.exp(e, e)
                     T.tile.mul(kgj, k_f_row, e)
                     T.tile.sub(e, g2_row, bc_row)
+                    T.tile.mul(e, e, LN2)
                     T.tile.exp(e, e)
                     T.tile.mul(q_f_row, q_f_row, e)
                     T.tile.mul(e, k_f_row, e)
@@ -659,15 +717,6 @@ def fla_chunk_intra_token_parallel_kernel(
     return main
 
 
-def _pick_head_group(H):
-    """BH is a performance tiling parameter, not a dispatch predicate:
-    pick the largest supported group that divides H (8 -> 4 -> 2)."""
-    for bh in (8, 4, 2):
-        if H % bh == 0:
-            return bh
-    return 0
-
-
 def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size=16):
     """Host wrapper: domain asserts (pure Python integer/dtype checks) +
     JIT launch. Returns (Aqk [B,S,H,chunk_size], Akk [B,S,H,sub_chunk_size]),
@@ -681,11 +730,22 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
         raise ValueError(f"chunk_size={CS} must be divisible by sub_chunk_size={SCS}")
     if SCS < 1 or CS < SCS:
         raise ValueError(f"invalid chunk/sub_chunk sizes: {CS}/{SCS}")
+    if CS & (CS - 1) or SCS & (SCS - 1):
+        # tile alignment: the [SCS, *] staging rows and the [SCS, CS] drain
+        # row must be pow2 (a non-pow2 SCS/CS crashes the TVM compiler
+        # instead of failing cleanly)
+        raise ValueError(
+            f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
     if DK % 16 != 0 or DK < 32:
         raise ValueError(f"DK={DK} must be a multiple of 16 and >= 32")
-    BH = _pick_head_group(H)
-    if BH == 0:
+    if H % 2 != 0:
         raise ValueError(f"H={H} must be divisible by 2 (minimum head group)")
+    BH = _pick_bh(H, SCS, DK, CS)
+    if BH == 0:
+        raise ValueError(
+            f"DK={DK} exceeds the 192KB unified-buffer budget at every "
+            f"head-group size (SCS={SCS}: even BH=2 needs "
+            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)")
     if BH * SCS < 16:
         # gemm_v0 L0B/L0C N-fractal lower bound with GGRP <= BH (iter7
         # GEMM-offload restructure; excludes only SCS < 8 at BH=2 corners)

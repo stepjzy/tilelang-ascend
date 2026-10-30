@@ -1,0 +1,30 @@
+/opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/utils/_path_manager.py:66: UserWarning: Permission mismatch: The owner of /opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/lib/libop_plugin_atb.so does not match.
+  warnings.warn(f"Permission mismatch: The owner of {path} does not match.")
+[PRECISION_PASS] l0/golden_self_check vectorized == naive (tiny shape)
+[PRECISION_PASS] l0/l0_min shape=(1,64,8,128) Aqk ratio=1.0000 max_abs=2.384e-07 | Akk ratio=1.0000 max_abs=2.441e-04
+[PRECISION_PASS] l0/l0_typical shape=(2,256,16,128) Aqk ratio=1.0000 max_abs=3.906e-03 | Akk ratio=1.0000 max_abs=6.250e-02
+[PRECISION_PASS] l0/l0_bench_repr shape=(1,1024,64,128) Aqk ratio=1.0000 max_abs=6.250e-02 | Akk ratio=1.0000 max_abs=6.250e-02
+[PRECISION_PASS] l1/l1_aligned_repr shape=(2, 128, 8, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=3.815e-06 | Akk ratio=1.0000 max_abs=2.441e-04
+[PRECISION_PASS] l1/l1_h6_bh2 shape=(1, 128, 6, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=1.953e-03 | Akk ratio=1.0000 max_abs=0.000e+00
+[PRECISION_PASS] l1/l1_h12_bh4 shape=(1, 128, 12, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=2.441e-04 | Akk ratio=1.0000 max_abs=9.766e-04
+[PRECISION_PASS] l1/l1_dk48 shape=(1, 64, 8, 48) cs=64 scs=16 Aqk ratio=1.0000 max_abs=2.794e-08 | Akk ratio=1.0000 max_abs=0.000e+00
+[PRECISION_PASS] l1/l1_edge_min_h2 shape=(1, 64, 2, 32) cs=64 scs=16 Aqk ratio=1.0000 max_abs=0.000e+00 | Akk ratio=1.0000 max_abs=0.000e+00
+[PRECISION_PASS] l1/l1_vrange_s shape=(1, 64, 8, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=0.000e+00 | Akk ratio=1.0000 max_abs=7.629e-06
+[PRECISION_PASS] l1/l1_vrange_l shape=(1, 64, 8, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=6.104e-05 | Akk ratio=1.0000 max_abs=2.441e-04
+[PRECISION_PASS] l1/l1_vrange_asym shape=(1, 64, 8, 128) cs=64 scs=16 Aqk ratio=1.0000 max_abs=0.000e+00 | Akk ratio=1.0000 max_abs=0.000e+00
+[PRECISION_PASS] l1/l1_scs8 shape=(1, 128, 8, 128) cs=64 scs=8 Aqk ratio=1.0000 max_abs=1.953e-03 | Akk ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] l2/l2_s_tail1 [D-SHAPE-TAIL-1]: rejected (ValueError: S=65 must be divisible by chunk_size=64)
+[BOUNDARY_PASS] l2/l2_s_tailmid [D-SHAPE-TAIL-MID]: rejected (ValueError: S=96 must be divisible by chunk_size=64)
+[BOUNDARY_PASS] l2/l2_s_prime [D-SHAPE-PRIME]: rejected (ValueError: S=127 must be divisible by chunk_size=64)
+[BOUNDARY_PASS] l2/l2_h_odd: rejected (ValueError: H=7 must be divisible by 2 (minimum head group))
+[BOUNDARY_PASS] l2/l2_dk_not_mul16: rejected (ValueError: DK=33 must be a multiple of 16 and >= 32)
+[BOUNDARY_PASS] l2/l2_dk_lt32: rejected (ValueError: DK=16 must be a multiple of 16 and >= 32)
+[BOUNDARY_PASS] l2/l2_chunk_invalid [D-PARAM-chunk_size]: rejected (ValueError: chunk_size=100 must be divisible by sub_chunk_size=16)
+[BOUNDARY_PASS] l2/l2_q_fp16 [D-EXC-DTYPE]: rejected (ValueError: q/k must be bfloat16)
+[BOUNDARY_PASS] l2/l2_gk_bf16 [D-EXC-DTYPE]: rejected (ValueError: gk must be float32)
+[BOUNDARY_PASS] l2/l2_beta_fp32 [D-EXC-DTYPE]: rejected (ValueError: beta must be bfloat16)
+[BOUNDARY_PASS] bnd_zero [D-SPECIAL-ZERO] Aqk ratio=1.0000 max_abs=0.000e+00 | Akk ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] bnd_inf_q [D-SPECIAL-INF] Aqk ratio=1.0000 max_abs=0.000e+00 | Akk ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] bnd_nan_beta [D-SPECIAL-NAN] Aqk ratio=1.0000 max_abs=1.907e-06 | Akk ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] bnd_dbound [D-SPECIAL-DBOUND] Aqk ratio=1.0000 max_abs=4.657e-10 | Akk ratio=1.0000 max_abs=4.702e-38
+Test Passed!

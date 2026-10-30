@@ -1,0 +1,12 @@
+/opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/utils/_path_manager.py:66: UserWarning: Permission mismatch: The owner of /opt/buildtools/python-3.12.9/lib/python3.12/site-packages/torch_npu/lib/libop_plugin_atb.so does not match.
+  warnings.warn(f"Permission mismatch: The owner of {path} does not match.")
+comment1: Aqk[1,0,0] = 0.125 (expected 0.125; the old code returned 32.0)
+[PASS] comment1 Aqk: ratio=1.0000 max_abs=0.000e+00
+[PASS] comment1 Akk: ratio=1.0000 max_abs=0.000e+00
+[PASS] comment2 DK=256/H=8 (BH->2) Aqk: ratio=1.0000 max_abs=9.766e-04
+[PASS] comment2 DK=256/H=8 (BH->2) Akk: ratio=1.0000 max_abs=1.118e-08
+comment2b: DK=512 correctly rejected: DK=512 exceeds the 192KB unified-buffer budget at every head-group size (SCS=16: even BH=2...
+comment3: CS=48/SCS=3 cleanly rejected at the domain gate: chunk_size=48 and sub_chunk_size=3 must be powers of two
+         (non-pow2 chunk sizes are outside the supported domain; the
+          old code instead picked GGRP=6 and read out-of-range gemm groups)
+ALL COMMENT PROBES PASS
