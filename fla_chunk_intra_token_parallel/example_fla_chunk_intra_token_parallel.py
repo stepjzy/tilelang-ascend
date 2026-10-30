@@ -192,12 +192,18 @@ def _ub_bytes(BH_V, SCS, DK, CS):
     staging = 2 * SCS * DK * 2 + 6 * SCS * DK * 4  # q/k rows + 6 fp32 rows
     accum = 3 * SCS * BH_V * DK * 4  # a_agg (2*SCS*BH_V) + b_agg (SCS*BH_V)
     fixed = (
-        SCS * 16 * (2 + 4 + 1 + 4 + 4) + SCS * 4  # beta_h/f, eq_m, beta_sel, j16b, beta_col
-        + 4 * SCS + 4 * 16  # idx + idx16
-        + 4 * SCS * SCS * 2 + SCS * SCS * 2  # i_grid/j_grid + lt_m/slt_m
-        + 2 * SCS * SCS * 4 + 2 * SCS * SCS * 4  # r_ub + r1_m/a_m
-        + SCS * CS * 4 + SCS * akk_w * 4  # aqk_s + akk_s
-        + SCS * CS * 2 + SCS * akk_w * 2  # aqk_h + akk_h
+        SCS * 16 * (2 + 4 + 1 + 4 + 4)
+        + SCS * 4  # beta_h/f, eq_m, beta_sel, j16b, beta_col
+        + 4 * SCS
+        + 4 * 16  # idx + idx16
+        + 4 * SCS * SCS * 2
+        + SCS * SCS * 2  # i_grid/j_grid + lt_m/slt_m
+        + 2 * SCS * SCS * 4
+        + 2 * SCS * SCS * 4  # r_ub + r1_m/a_m
+        + SCS * CS * 4
+        + SCS * akk_w * 4  # aqk_s + akk_s
+        + SCS * CS * 2
+        + SCS * akk_w * 2  # aqk_h + akk_h
     )
     return staging + accum + fixed
 
@@ -235,7 +241,8 @@ def _pick_ggrp(BH, SCS, DK):
     raise ValueError(
         f"no divisor of BH={BH} satisfies the gemm constraints "
         f"(L0A budget GGRP*2*SCS*DK*4B <= 64KB and N=GGRP*SCS >= 16) "
-        f"with SCS={SCS}, DK={DK}")
+        f"with SCS={SCS}, DK={DK}"
+    )
 
 
 @tilelang.jit(out_idx=[-2, -1], workspace_idx=[4, 5, 6], pass_configs=PASS_CONFIGS)
@@ -689,8 +696,7 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
         # tile alignment: the [SCS, *] staging rows and the [SCS, CS]
         # drain row must be pow2 (non-pow2 chunk sizes crash the TVM
         # compiler instead of failing cleanly)
-        raise ValueError(
-            f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
+        raise ValueError(f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
     if DK % 16 != 0 or DK < 32:
         raise ValueError(f"DK={DK} must be a multiple of 16 and >= 32")
     if H % 2 != 0:
@@ -700,7 +706,8 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
         raise ValueError(
             f"DK={DK} exceeds the 192KB unified-buffer budget at every "
             f"head-group size (SCS={SCS}: even BH=2 needs "
-            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)")
+            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)"
+        )
     if BH * SCS < 16:
         # gemm_v0 L0B/L0C N-fractal lower bound with GGRP <= BH
         # (excludes only SCS < 8 at BH=2 corners)

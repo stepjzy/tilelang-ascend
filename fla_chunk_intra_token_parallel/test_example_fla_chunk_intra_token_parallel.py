@@ -145,8 +145,8 @@ if __name__ == "__main__":
         print(f"Test pass! DK=512 rejected: {str(exc)[:80]}...")
     try:
         fla_chunk_intra_token_parallel(
-            q[:, :, :, :32].contiguous(), k[:, :, :, :32].contiguous(),
-            gk[:, :, :, :32].contiguous(), beta, chunk_size=48, sub_chunk_size=3)
+            q[:, :, :, :32].contiguous(), k[:, :, :, :32].contiguous(), gk[:, :, :, :32].contiguous(), beta, chunk_size=48, sub_chunk_size=3
+        )
         raise AssertionError("CS=48/SCS=3 must be rejected (pow2 tile alignment)")
     except ValueError as exc:
         print(f"Test pass! CS=48/SCS=3 rejected: {str(exc)[:80]}...")
