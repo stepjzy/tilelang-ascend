@@ -274,3 +274,37 @@
     /tmp/opencode/repro_cache_bug.py（隔离复现：旧码 BUG REPRODUCED / 新码 PASS）
     /tmp/opencode/old_kernel_test/（旧码 + 新测试：EXPECTED FAILURE，dq diff=9.97e-01）
     /tmp/opencode/ab_bench.py（同进程交替 A/B：内容键 +3.60% / version 键 −0.04%）
+
+## CI 复盘 — 2026-10-30（review 修复推送后全量 CI 失败的定位）
+- mode: ci_diagnosis（PR #1928 f1c0eaf 推送后 Benchmark Tests (Ascend NPU) job failure）
+- classification: runner_infra_flake（非代码缺陷）
+- 现象: f1c0eaf 的全量 CI 失败（55min run，pytest 3 failed / 164 passed）；而 872bbdd（修复前）10-22 的全量 CI 是 success（32min）——表面上是"review 修复引入了失败"。
+- 定位过程（方法可复用）:
+  1. logs API 需 admin 权限拿不到 → 用本机 git 凭据（push 用过的）走 artifacts API 下载 test-results
+     （GET actions/runs/{id}/artifacts → artifacts/{id}/zip，公开仓任何已认证用户可读）；
+  2. test_output.log 全文分析：本 PR 的 3 个测试（主测试 + 2 个新回归测试）全部 PASSED（进度 93%/95%/97%）；
+     legacy bench 部分 Pass rate 100%、0 失败；sparse_mla_bwd 在 legacy runner 被 manifest 正确跳过；
+  3. 3 个失败测试归属 situ_glu / xllm_kernels（与本 PR 零依赖交集）；
+  4. 时间线：失败集中在 pytest 阶段最后 ~15min（E39007 设备子进程启动超时 / LazySetDevice 507033 /
+     check hdc service——rope 和 split_qkv 连 torch.randn(device=npu) 都失败，纯基础设施故障）。
+- situ_glu_l1 非确定性三重证据:
+  1. 本地同基线（463c234c，与 CI merge base 完全一致）910B3 复跑 PASSED（79.6s）；
+  2. 每日全量报告（daily-test issue）：10-25/27/28 同一 A3 runner 2903/2903 全过（含该测试）；
+  3. situ_glu 是 10-23 合入的新算子（#1891）——10-22 我方全量通过时它不存在，"上次过这次不过"
+     实为"上次没跑过它"，非回归。
+- 基线自身不稳的证据: ascendc_pto 每日全量 CI 间歇失败（10-21✗ 10-22✗ 10-23✓ 10-24✗ 10-25✓
+  10-26✗ 10-27✓ 10-28✓ 10-29✗ 10-30✗）；10-29 同日 sparse-mla-fwd / indexer-topk / a2a3-scheduler
+  等全量 PR 全部失败。共享 A3 runner 的设备故障是仓库级已知现象。
+- 处置: PR 评论 /re-test（仓里自带的重跑失败 job 机制，ci_cd.yml issue_comment 触发）→
+  run 40869362773 queued attempt=2。已附技术说明评论供 reviewer 参考。
+- 通用教训: |
+  1. manifest/CI 配置文件的变更会触发全量 CI（ci_cd.yml detect_changes 的 catch-all 规则），
+     迁移类 PR 天然暴露于全量套件的 flake 之下——失败的测试清单必须逐个归属核对，不能默认
+     "PR 挂了=PR 代码错了"；
+  2. 定位三步法：artifacts 下载（本机 git 凭据即可）→ 失败测试归属与时间线 → 与基线每日报告
+     交叉验证（daily-test issue 是免费的基线健康度序列）；
+  3. 设备故障特征串：E39007 / 507033 / "check hdc service" / "open device failed"——出现即基础设施
+     flake，正确处置是 /re-test 而非改代码。
+- 证据文件: |
+  /tmp/opencode/ci_artifact/test_output.log（失败 run 全量测试日志）
+  本地复跑：examples/situ_glu/test_situ_glu.py::test_situ_glu_l1 PASSED (79.62s, 基线 463c234c)
