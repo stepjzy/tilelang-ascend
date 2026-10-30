@@ -155,3 +155,39 @@ D-VALRANGE-ASYM:1 D-VALRANGE-L:1 D-VALRANGE-M:1 D-VALRANGE-S:1
 [BOUNDARY_WARN]  bnd_inf_g / bnd_g_dbound（非阻塞，见 boundary_warnings）
 Test Passed! (exit 0)
 ```
+
+---
+
+## PR #1953 评审修复（2026-10-30，ChaoyangJi 评审意见）
+
+**问题**：乘法 mask 无法清除上三角 Inf/NaN（q=h=g=0、v=1、A 仅上三角 Inf 时，
+正确输出应全零，但 Inf×0=NaN 污染输出；上游 Triton 用 tl.where 清零）。
+
+**修复链**（example_fla_chunk_o.py + test 双侧）：
+1. kernel：`T.tile.mul(a_f32, a_f32, msk_ub_fp32)` → `T.tile.select(a_f32[0:32, 0:64],
+   msk_bits, a_f32[0:32, 0:64], 0.0, "VSEL_TENSOR_SCALAR_MODE")`，Msk 从 [64,64] fp32
+   改为 [512] uint8 位打包（LSB-first，bit(t*64+j)=t>=j）
+2. golden：`Am = Ac * M` → `torch.where(M_bool, Ac, 0)`
+3. 测试门限：check_output 增加非有限位置结构比对；新增 bnd_a_upper_inf 回归用例
+   （评审场景，max_abs=0.000e+00）
+
+**踩坑（本轮最重要发现）——tile.select 的 vid 分裂缺口**：
+- 直接替换后 l1_bench（唯一深流水 shape）FAIL：ratio=0.9994、max_abs 随运行变化
+  （19.8→33.3）＝竞态表象；小 shape 全过
+- 对照实验：mul 版+新 golden PASS → select 是唯一触发因子；独立 dst（候选 C）无效
+- **根因（生成代码实证）**：vid-reduction pass 把二值算子（mul 等）改写为半量
+  （repeat=32=2048 元素）+ buffer 半量分配（GetWithOffset(2048)），但 **tile.select
+  不在改写集**：count 维持全量 4096。threads=2 下每个 vid 持有半量 buffer
+  （[32,64]）与 256B 位图，全量 select 每个 vid 写 4096 元素 → **越界 8KB 砸掉
+  per-vid 邻居 buffer**；深流水（136 batch）下被污染数据在重写前被读出 → 竞态
+- **修复**：select 作用于半高 region `[0:BS//2, 0:BS]` —— count=2048 恰为每 vid
+  有效行，与各 vid 本地 [0..2048) 元素 + 256B 位图完全对齐，零越界
+
+**验证**：全量 27 用例（25 PASS + 2 既有 WARN）；l1_bench 三连跑稳定 ratio=1.0000、
+max_abs=1.25e-01（与 mul 版一致）；性能 1.410-1.424ms（与修前 1.417ms 同带，V 侧
+throttle-bound 下 select 与 mul 等价）；交付版 3 用例 + 冒烟全过；ruff/format clean。
+
+**工具链结论**（上游反馈项）：① vid-reduction 不改写 tile.select（count 不减半，
+dst 越界）；② VSEL selMask 要求 uint8 打包位图（LSB-first），不接受逐元素 0/1
+fp32；③ tile.compare/select 共享位打包约定（compare 文档已明示，select 文档
+selMask 描述不足）。

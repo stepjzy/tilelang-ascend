@@ -50,7 +50,7 @@ def fla_chunk_o_ref(q, v, g, A, h, scale=None, chunk_size=64):
         scale = 1.0 / DK**0.5
     NT = S // C
     qf, vf, Af, hf = q.float(), v.float(), A.float(), h.float()
-    M = torch.tril(torch.ones(C, C, dtype=torch.float32), 0)  # incl diag (t >= j)
+    M = torch.tril(torch.ones(C, C, dtype=torch.bool), 0)  # incl diag (t >= j)
     o = torch.empty(B, S, H, DV, dtype=v.dtype)
     for i in range(NT):
         sl = slice(i * C, (i + 1) * C)
@@ -58,9 +58,12 @@ def fla_chunk_o_ref(q, v, g, A, h, scale=None, chunk_size=64):
         Ac, vc, hc = Af[:, sl], vf[:, sl], hf[:, i]  # [B,C,H,C]/[B,C,H,DV]/[B,H,DK,DV]
         qg = qc * scale * torch.exp2(gc)  # [B,C,H,DK]
         o_inter = torch.einsum("bchk,bhkd->bchd", qg, hc)  # inter-chunk
-        # intra-chunk (tril incl diag over the chunk dims (t, j); Triton
-        # semantics m_s[t, j] = t >= j, b_o += dot(where(m_s, A, 0), v))
-        Am = Ac * M[None, :, None, :]  # [B,C,H,C] mask over (t, j)
+        # intra-chunk (tril incl diag over the chunk dims (t, j); upstream
+        # semantics m_s[t, j] = t >= j, b_o += dot(where(m_s, A, 0), v)).
+        # where (not * mask): the strict upper triangle must be zeroed even
+        # when A carries Inf/NaN there (Inf*0 = NaN would leak through a
+        # multiplicative mask).
+        Am = torch.where(M[None, :, None, :], Ac, torch.zeros((), dtype=Ac.dtype))  # [B,C,H,C]
         o_intra = torch.einsum("bthj,bjhd->bthd", Am, vc)
         o[:, sl] = (o_inter + o_intra).to(v.dtype)
     return o
@@ -437,11 +440,26 @@ def test_fla_chunk_o_boundary():
         gf[::59] = -120.0
         return run("g_dbound", (q, v, g, A, h))
 
+    # regression (PR review): Inf confined to the STRICT UPPER triangle of A
+    # must be zeroed by the mask (where semantics). q=h=g=0, v=1, A=0 except
+    # A[0, 1]=Inf on the first chunk -> o must be exactly 0 everywhere; a
+    # multiplicative mask turns Inf into NaN (Inf*0) and pollutes row 0.
+    def a_upper_inf():
+        q = torch.zeros(B, S, H, DK)
+        v = torch.ones(B, S, H, DV)
+        g = torch.zeros(B, S, H, DK)
+        A = torch.zeros(B, S, H, 64)
+        h = torch.zeros(B, S // 64, H, DK, DV)
+        A[0, 0, 0, 1] = float("inf")
+        A[0, 64, 1, 2] = float("-inf")  # second chunk, another head
+        return run("a_upper_inf", (q, v, g, A, h))
+
     _run_boundary("bnd_zero [D-SPECIAL-ZERO]", zero)
     _run_boundary("bnd_inf_v [D-SPECIAL-INF]", inf_v)
     _run_boundary("bnd_inf_g [D-SPECIAL-INF]", inf_g)
     _run_boundary("bnd_nan_qv [D-SPECIAL-NAN]", nan_qv)
     _run_boundary("bnd_g_dbound [D-SPECIAL-DBOUND]", g_dbound)
+    _run_boundary("bnd_a_upper_inf [D-SPECIAL-INF]", a_upper_inf)
 
 
 # ============================================================================

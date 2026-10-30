@@ -38,7 +38,9 @@ host 分发延迟的隐藏/暴露机制与地板核算。
 - 分支 feat/fla-chunk-o-pr（origin，基于 upstream/ascendc_pto@43b0b697）：
   examples_experiment/dsa_sparse_finetune/{example_fla_chunk_o.py,
   test_example_fla_chunk_o.py}
-- PR: 用户网页自行创建（compare: ascendc_pto...stepjzy:feat/fla-chunk-o-pr）
+- PR: [#1953](https://github.com/tile-ai/tilelang-ascend/pull/1953)（open，
+  评审轮 1 已修复：乘法 mask → VSEL Select 位打包掩码 + where 语义 golden +
+  非有限结构门限 + 上三角 Inf 回归用例；详见 debug_log PR 修复节）
 - 性能：官方均值 1.417ms（含 _FastLaunch；公共路径 1.492ms）vs 目标 1320us，
   超 7.5%（设备侧同步协议地板，工具链级，详见 final_summary R4/R5 地板核算表）
 
