@@ -31,7 +31,7 @@ def fla_chunk_o_ref(q, v, g, A, h, scale=None, chunk_size=64):
         scale = 1.0 / DK**0.5
     NT = S // C
     qf, vf, Af, hf = q.float(), v.float(), A.float(), h.float()
-    M = torch.tril(torch.ones(C, C, dtype=torch.float32), 0)  # incl diag (t >= j)
+    M = torch.tril(torch.ones(C, C, dtype=torch.bool), 0)  # incl diag (t >= j)
     o = torch.empty(B, S, H, DV, dtype=v.dtype)
     for i in range(NT):
         sl = slice(i * C, (i + 1) * C)
@@ -40,8 +40,11 @@ def fla_chunk_o_ref(q, v, g, A, h, scale=None, chunk_size=64):
         qg = qc * scale * torch.exp2(gc)  # [B,C,H,DK]
         o_inter = torch.einsum("bchk,bhkd->bchd", qg, hc)  # inter-chunk
         # intra-chunk (tril incl diag over the chunk dims (t, j); upstream
-        # semantics m_s[t, j] = t >= j, b_o += dot(where(m_s, A, 0), v))
-        Am = Ac * M[None, :, None, :]  # [B,C,H,C] mask over (t, j)
+        # semantics m_s[t, j] = t >= j, b_o += dot(where(m_s, A, 0), v)).
+        # where (not * mask): the strict upper triangle must be zeroed even
+        # when A carries Inf/NaN there (Inf*0 = NaN would leak through a
+        # multiplicative mask).
+        Am = torch.where(M[None, :, None, :], Ac, torch.zeros((), dtype=Ac.dtype))  # [B,C,H,C]
         o_intra = torch.einsum("bthj,bjhd->bthd", Am, vc)
         o[:, sl] = (o_inter + o_intra).to(v.dtype)
     return o
@@ -69,6 +72,12 @@ def check_output(name, out, ref, atol, rtol, max_abs_limit, required_ratio):
     overall matched_ratio >= required and max_abs <= limit)."""
     y_cpu = out.detach().cpu().float()
     ref_cpu = ref.detach().cpu().float()
+    # Structural gate: actual's non-finite positions must match the golden's
+    # (catches e.g. an Inf*0=NaN leaking through a multiplicative mask).
+    assert torch.equal(torch.isfinite(y_cpu), torch.isfinite(ref_cpu)), (
+        f"{name} non-finite structure mismatch: actual {(~torch.isfinite(y_cpu)).sum().item()}"
+        f" vs golden {(~torch.isfinite(ref_cpu)).sum().item()} non-finite elements"
+    )
     m = torch.isfinite(ref_cpu)
     abs_err = (y_cpu[m] - ref_cpu[m]).abs()
     ratio = (abs_err <= (atol + rtol * ref_cpu[m].abs())).float().mean().item()
@@ -98,5 +107,27 @@ if __name__ == "__main__":
         # bf16 mixed tolerance
         atol, rtol, max_abs_limit, required_ratio = 2**-10, 2**-6, 1e0, 0.99
         check_output("o", o, ref, atol, rtol, max_abs_limit, required_ratio)
+
+    # Regression (PR review): Inf confined to the STRICT UPPER triangle of A
+    # must be zeroed by the mask (upstream tl.where semantics). With q=h=g=0,
+    # v=1 and A=0 except upper-triangle Inf, the output must be exactly 0
+    # everywhere; a multiplicative mask turns Inf into NaN (Inf*0) and
+    # pollutes the affected chunk rows.
+    B, S, H, DK, DV, CS = 1, 64, 1, 64, 64, 64
+    q = torch.zeros(B, S, H, DK)
+    v = torch.ones(B, S, H, DV)
+    g = torch.zeros(B, S, H, DK)
+    A = torch.zeros(B, S, H, CS)
+    h = torch.zeros(B, S // CS, H, DK, DV)
+    A[0, 0, 0, 1] = float("inf")  # strict upper triangle of chunk 0
+    cpu = (q.to(torch.bfloat16), v.to(torch.bfloat16), g, A.to(torch.bfloat16), h.to(torch.bfloat16))
+    npu = tuple(t.npu() for t in cpu)
+    print(f"Testing fla_chunk_o regression upper-tri Inf with shape={(B, S, H, DK, DV)}")
+    o = fla_chunk_o(*npu)
+    torch.npu.synchronize()
+    print("Init successful!")
+    ref = fla_chunk_o_ref(*cpu)
+    atol, rtol, max_abs_limit, required_ratio = 2**-10, 2**-6, 1e0, 0.99
+    check_output("o", o, ref, atol, rtol, max_abs_limit, required_ratio)
 
     print("Kernel Output Match!")

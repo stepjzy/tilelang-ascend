@@ -84,10 +84,22 @@ Ascend toolchain adaptations (all empirically verified on 910B3):
    does NOT track user-issued IDs, and an ID collision silently corrupts
    the handshake (observed and fixed; auto IDs observed in the 0..40
    range on this kernel, user IDs start at 48).
-6. The tril mask is a constant Msk[64,64] GM input (inclusive diagonal,
-   tril(ones, 0)) multiplied in the fp32 domain via T.tile.mul --
-   T.if_then_else is unavailable in tile ops. Exact in bf16 (0/1 mask).
-   The Msk load is hoisted out of the task loop (loop-invariant).
+6. The tril mask is applied with an element-wise Select (T.tile.select,
+   VSEL_TENSOR_SCALAR_MODE) against a bit-packed uint8 constant
+   (Msk[BS*BS//8]: bit (t*BS+j), LSB-first, is 1 iff t >= j, inclusive
+   diagonal). A multiplicative 0/1 mask CANNOT clear non-finite
+   upper-triangle values (Inf*0 = NaN pollutes the intra-chunk gemm),
+   while Select zeroes them exactly -- matching the upstream tl.where
+   semantics. The VSEL selMask must be a packed bitmap, not per-element
+   0/1 values (compare/select share the bit-packed convention). The
+   select operates on the HALF-HEIGHT region [0:BS/2, 0:BS]: the
+   vid-reduction pass splits recognized binary ops (mul et al.) to the
+   per-sub-block half automatically, but NOT tile.select -- a full-tile
+   select would run 4096 elements against each vid's 256B mask half and
+   overflow the destination buffer by 8KB. The half-region makes the
+   element count match each vid's own 32 rows and its 256B mask bits
+   exactly. The mask load is hoisted out of the task loop
+   (loop-invariant).
 7. Element math uses buffer-level T.tile.* instructions only (element
    T.Parallel loops are a measured -26%..-71%/kernel antipattern).
 8. Q/G/A/O are consumed through zero-copy 3D views [B, S, H*D] of the
@@ -262,7 +274,7 @@ def fla_chunk_o_kernel(
         G: T.Tensor((B, S, H * DK), "float32"),  # type: ignore
         A: T.Tensor((B, S, H * BS), "bfloat16"),  # type: ignore
         Hstate: T.Tensor((B, NT, H, DK, DV), "bfloat16"),  # type: ignore
-        Msk: T.Tensor((BS, BS), "float32"),  # type: ignore
+        Msk: T.Tensor((BS * BS // 8,), "uint8"),  # type: ignore
         # Explicit V->C relay workspaces (L2-resident, slot ring).
         workspace_1: T.Tensor((CORE_EFF, NSLOT, BS, DK), "bfloat16"),  # type: ignore
         workspace_2: T.Tensor((CORE_EFF, NSLOT, BS, DK), "bfloat16"),  # type: ignore
@@ -299,7 +311,7 @@ def fla_chunk_o_kernel(
             qg_lo_l1_c = T.alloc_shared([BS, DK], "bfloat16")  # inter LHS lo, 2
             a_half = T.alloc_shared([BS, BS], "bfloat16")  # A load staging (chunk A)
             a_f32 = T.alloc_shared([BS, BS], "float32")  # A fp32 domain
-            msk_ub = T.alloc_shared([BS, BS], "float32")  # tril constant
+            msk_bits = T.alloc_shared([BS * BS // 8], "uint8")  # tril bits, packed
             a_mask = T.alloc_shared([BS, BS], "bfloat16")  # masked A (bf16, exact)
             q_half = T.alloc_shared([BS, DK], "bfloat16")  # q load staging (chunk A)
             q_ub = T.alloc_shared([BS, DK], "float32")  # q fp32 (reused: qg, lo)
@@ -325,7 +337,7 @@ def fla_chunk_o_kernel(
             o_frag_b = T.alloc_fragment([BS, bDV], "float32")  # L0C, chunk B
 
             # ---- loop-invariant hoist: the tril constant loads once per core ----
-            T.copy(Msk[0:BS, 0:BS], msk_ub)
+            T.copy(Msk[0 : BS * BS // 8], msk_bits)
 
             # ---- prologue: stage batch 0's three chunks. Batch 0 = strided tasks
             # t = 0,1,2 (tid = cid + t*CORE_EFF); chunk 0 (tid = cid) is always
@@ -444,7 +456,13 @@ def fla_chunk_o_kernel(
             T.copy(workspace_2[cid, slot2_, 0:BS, 0:DK], qg_lo_l1_c)
             # -- Vector: chunk 0: mask + a relay --
             T.copy(a_half, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot0_, 0:BS, 0:BS])
             # -- Vector: chunk 0: gate chain + hi/lo relays --
@@ -472,7 +490,13 @@ def fla_chunk_o_kernel(
             T.set_cross_flag("FIX", THROTTLE_FLAG_ID)
             # -- Vector: chunk 1: mask + a relay --
             T.copy(a_half2, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot1_, 0:BS, 0:BS])
             # -- Vector: chunk 1: gate chain + hi/lo relays --
@@ -499,7 +523,13 @@ def fla_chunk_o_kernel(
             T.copy(o_frag_b, O[c1_bb, c1_s0 : c1_s0 + BS, c1_bh * bDV : (c1_bh + 1) * bDV])
             # -- Vector: chunk 2: mask + a relay --
             T.copy(a_half3, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot2_, 0:BS, 0:BS])
             # -- Vector: chunk 2: gate chain + hi/lo relays --
@@ -609,7 +639,13 @@ def fla_chunk_o_kernel(
             T.copy(workspace_2[cid, slot2_, 0:BS, 0:DK], qg_lo_l1_c)
             # -- Vector: chunk 0: mask + a relay --
             T.copy(a_half, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot0_, 0:BS, 0:BS])
             # -- Vector: chunk 0: gate chain + hi/lo relays --
@@ -637,7 +673,13 @@ def fla_chunk_o_kernel(
             T.set_cross_flag("FIX", THROTTLE_FLAG_ID)
             # -- Vector: chunk 1: mask + a relay --
             T.copy(a_half2, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot1_, 0:BS, 0:BS])
             # -- Vector: chunk 1: gate chain + hi/lo relays --
@@ -664,7 +706,13 @@ def fla_chunk_o_kernel(
             T.copy(o_frag_b, O[c1_bb, c1_s0 : c1_s0 + BS, c1_bh * bDV : (c1_bh + 1) * bDV])
             # -- Vector: chunk 2: mask + a relay --
             T.copy(a_half3, a_f32)
-            T.tile.mul(a_f32, a_f32, msk_ub)
+            T.tile.select(
+                a_f32[0 : BS // 2, 0:BS],
+                msk_bits,
+                a_f32[0 : BS // 2, 0:BS],
+                0.0,
+                "VSEL_TENSOR_SCALAR_MODE",
+            )
             T.copy(a_f32, a_mask)
             T.copy(a_mask, workspace_3[cid, slot2_, 0:BS, 0:BS])
             # -- Vector: chunk 2: gate chain + hi/lo relays --
@@ -777,7 +825,13 @@ def fla_chunk_o_kernel(
                 T.copy(workspace_2[cid, slot2_, 0:BS, 0:DK], qg_lo_l1_c)
                 # -- Vector: chunk 0: mask + a relay --
                 T.copy(a_half, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot0_, 0:BS, 0:BS])
                 # -- Vector: chunk 0: gate chain + hi/lo relays --
@@ -805,7 +859,13 @@ def fla_chunk_o_kernel(
                 T.set_cross_flag("FIX", THROTTLE_FLAG_ID)
                 # -- Vector: chunk 1: mask + a relay --
                 T.copy(a_half2, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot1_, 0:BS, 0:BS])
                 # -- Vector: chunk 1: gate chain + hi/lo relays --
@@ -832,7 +892,13 @@ def fla_chunk_o_kernel(
                 T.copy(o_frag_b, O[c1_bb, c1_s0 : c1_s0 + BS, c1_bh * bDV : (c1_bh + 1) * bDV])
                 # -- Vector: chunk 2: mask + a relay --
                 T.copy(a_half3, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot2_, 0:BS, 0:BS])
                 # -- Vector: chunk 2: gate chain + hi/lo relays --
@@ -945,7 +1011,13 @@ def fla_chunk_o_kernel(
                 T.copy(workspace_2[cid, slot2_, 0:BS, 0:DK], qg_lo_l1_c)
                 # -- Vector: chunk 0: mask + a relay --
                 T.copy(a_half, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot0_, 0:BS, 0:BS])
                 # -- Vector: chunk 0: gate chain + hi/lo relays --
@@ -973,7 +1045,13 @@ def fla_chunk_o_kernel(
                 T.set_cross_flag("FIX", THROTTLE_FLAG_ID)
                 # -- Vector: chunk 1: mask + a relay --
                 T.copy(a_half2, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot1_, 0:BS, 0:BS])
                 # -- Vector: chunk 1: gate chain + hi/lo relays --
@@ -1000,7 +1078,13 @@ def fla_chunk_o_kernel(
                 T.copy(o_frag_b, O[c1_bb, c1_s0 : c1_s0 + BS, c1_bh * bDV : (c1_bh + 1) * bDV])
                 # -- Vector: chunk 2: mask + a relay --
                 T.copy(a_half3, a_f32)
-                T.tile.mul(a_f32, a_f32, msk_ub)
+                T.tile.select(
+                    a_f32[0 : BS // 2, 0:BS],
+                    msk_bits,
+                    a_f32[0 : BS // 2, 0:BS],
+                    0.0,
+                    "VSEL_TENSOR_SCALAR_MODE",
+                )
                 T.copy(a_f32, a_mask)
                 T.copy(a_mask, workspace_3[cid, slot2_, 0:BS, 0:BS])
                 # -- Vector: chunk 2: gate chain + hi/lo relays --
@@ -1079,14 +1163,20 @@ _MSK_CACHE = {}
 
 
 def _get_msk(device, chunk_size):
-    """Inclusive-tril constant (diagonal=0), built ONCE per (device, chunk).
-
-    Per-call reconstruction would cost a CPU tril + a potentially
-    synchronizing H2D copy inside the timed region.
+    """Inclusive-tril bit-packed constant (diagonal=0), built ONCE per
+    (device, chunk). Packed LSB-first into chunk*chunk//8 bytes (the VSEL
+    selMask convention): bit (t*chunk + j) of the little-endian byte stream
+    is 1 iff t >= j. A packed bitmap (not a 0/1 float tensor) is required
+    by T.tile.select's selMask operand.
     """
     key = (str(device), chunk_size)
     if key not in _MSK_CACHE:
-        _MSK_CACHE[key] = torch.tril(torch.ones(chunk_size, chunk_size, dtype=torch.float32), 0).to(device)
+        n = chunk_size * chunk_size
+        m = torch.tril(torch.ones(chunk_size, chunk_size, dtype=torch.uint8), 0).reshape(-1)
+        bits = torch.zeros(n // 8, dtype=torch.uint8)
+        for b in range(8):
+            bits |= (m[b::8] << b).to(torch.uint8)
+        _MSK_CACHE[key] = bits.to(device)
     return _MSK_CACHE[key]
 
 
