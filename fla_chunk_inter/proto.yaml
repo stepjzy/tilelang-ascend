@@ -1,0 +1,88 @@
+# proto.yaml — fla_chunk_inter 算子接口规格（KDA chunked 反传 inter-chunk 梯度，单 kernel）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_chunk_inter.py                 Triton/FLA 参考实现（语义权威）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_chunk_inter.py
+#     全文件迁移：chunk_kda_bwd_kernel_inter / wrapper chunk_kda_bwd_dqkwg（bwd dq/dk/dw/dg）。
+#   - ref_gpu/fla_chunk_inter_tilelang_gpu.py    上游 TileLang CUDA 版（代码级迁移起点 + 测试样例）
+#     ← tile-ai/tilelang@main examples/kda/chunk_bwd_dqkwg.py
+#   - ref_gpu/test_utils_kda.py                  上游 do_bench 计时口径（warmup 20, rep 10, mean）
+# 范围：定长序列（非 varlen，用户确认 2026-11-02）；scale=1.0、全 fp32（对齐上游
+#   benchmark main()）；varlen 分支不在本次范围。
+#   注：Triton wrapper 的 w 参数未被 kernel 使用（dw 由 dv·h^T 取负推导），本算子不收 w。
+# 编程模式：Developer（用户指定，2026-11-02）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/precision-standard.md
+#   混合容差，golden = PyTorch 重写参考实现，用户要求 2026-11-02）：
+#   - 4 个输出 dq/dk/dw/dg（fp32）：阈值按 precision-standard.md fp32 标准执行，
+#     matched_ratio ≥ 0.99（以标准文档为准）。
+# 性能目标：纯 Kernel 时间（该算子所有核函数总耗时合计）< 3400 us；
+#   口径 = 主仓原 GPU 测试样例（对齐 examples/kda/chunk_bwd_dqkwg.py do_bench：
+#   预热 20 次后重复 10 次取平均，仅设备侧 kernel 执行时间，不含张量构造/
+#   H2D-D2H/JIT/框架开销）：
+#   - benchmark：B=1, S=8192, H=64, DK=128, DV=128, chunk_size=64, scale=1.0，
+#     全部张量 fp32，输出 dq/dk fp32 + dw/dg fp32。
+operator:
+  name: fla_chunk_inter
+  category: Fusion  # C/V 混合：GEMM (Cube) 为主 + exp2/逐元素乘/reduce (Vector)
+  formula: |
+    记 chunk 长度 BT=64，c = t // BT 为 chunk 序号，last(c) = min(S, (c+1)*BT) - 1，
+    scale = 1.0，g 为逐 token 累积 log2 衰减（fp32），
+    h 为 chunk 级隐状态 [BS, H, DK, DV]，dh 为其梯度，dv/do 为 v/o 的梯度，
+    ⊙ 为逐元素乘，^T 为转置；所有 GEMM 沿 DV 维分块累加（fp32 累加）。
+    逐 chunk 逐 head 逐 DK-block：
+      # inter-chunk 梯度主体（bwd）
+      dq_raw[t, k] = Σ_v do[t, v] * h[c, k, v]        # GEMM: do @ h^T  [BT, DK]
+      dk_raw[t, k] = Σ_v v[t, v]  * dh[c, k, v]        # GEMM: v  @ dh^T [BT, DK]
+      dw[t, k]     = -Σ_v dv[t, v] * h[c, k, v]       # GEMM 取负: -(dv @ h^T)
+      dgk[k]       = (Σ_v h[c, k, v] * dh[c, k, v]) * 2^g[last(c), k]   # 逐元素乘后沿 V reduce
+      # 门控缩放（Vector 路径）
+      dq[t, k]     = dq_raw[t, k] * scale * 2^g[t, k]
+      dk[t, k]     = dk_raw[t, k] * 2^(g[last(c), k] - g[t, k])   # 仅 t < T 有效行
+      # dg 门控梯度（t == last(c) 行注入 dgk）
+      dg[t, k]     = q[t, k] * dq[t, k] - k_mat[t, k] * dk[t, k]
+                     + (t == last(c)) * (dgk[k] + Σ_t' dk[t', k] * k_mat[t', k])
+    （等价 Triton 参考实现：b_dq += tl.dot(b_do, b_h^T)；b_dk += tl.dot(b_v, b_dh^T)；
+      b_dw += tl.dot(b_dv, b_h^T) 后 store 取负；b_dgk = Σ_v h*dh * exp2(gn) +
+      Σ_t dk_scaled*k；b_dg = q*dq - k*dk + m_last*b_dgk）
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: scale
+      type: Float
+      default: 1.0
+      required: false
+  inputs:
+    - name: q       # [B, S, H, DK]
+      dtype: [float32]
+    - name: k       # [B, S, H, DK]
+      dtype: [float32]
+    - name: v       # [B, S, H, DV]
+      dtype: [float32]
+    - name: g       # [B, S, H, DK] 逐 token 累积 log2 衰减
+      dtype: [float32]
+    - name: h       # [B, S//chunk_size, H, DK, DV] chunk 级隐状态
+      dtype: [float32]
+    - name: dv      # [B, S, H, DV]
+      dtype: [float32]
+    - name: do      # [B, S, H, DV]
+      dtype: [float32]
+    - name: dh      # [B, S//chunk_size, H, DK, DV]
+      dtype: [float32]
+  outputs:
+    - name: dq      # [B, S, H, DK]
+      dtype: [float32]
+    - name: dk      # [B, S, H, DK]
+      dtype: [float32]
+    - name: dw      # [B, S, H, DK]
+      dtype: [float32]
+    - name: dg      # [B, S, H, DK]
+      dtype: [float32]
+  schema: >-
+    fla_chunk_inter_bwd(q: Tensor[B,S,H,DK] fp32, k: Tensor[B,S,H,DK] fp32,
+    v: Tensor[B,S,H,DV] fp32, g: Tensor[B,S,H,DK] fp32,
+    h: Tensor[B,S//64,H,DK,DV] fp32, dv: Tensor[B,S,H,DV] fp32,
+    do: Tensor[B,S,H,DV] fp32, dh: Tensor[B,S//64,H,DK,DV] fp32,
+    scale: float = 1.0, chunk_size: int = 64)
+    -> (dq: Tensor[B,S,H,DK] fp32, dk: Tensor[B,S,H,DK] fp32,
+    dw: Tensor[B,S,H,DK] fp32, dg: Tensor[B,S,H,DK] fp32)

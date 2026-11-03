@@ -1,0 +1,32 @@
+{
+  "round": "R4",
+  "iteration": 0,
+  "timestamp": "2026-11-03T18:58+08:00",
+  "kernel_md5": "a48af256259f15e37134deef1b384cd3",
+  "state": "post-delivery-fix (D-2 scratch-free restructure), precision all-green",
+  "shape": "B=1,S=8192,H=64,DK=128,DV=128,chunk=64,scale=1.0,fp32",
+  "bench_protocol": "do_bench warmup=20/rep=10/mean/device-side NPU events only",
+  "baseline_time_us": 7510.3,
+  "baseline_runs_us": [
+    7508.8,
+    7511.6,
+    7510.5
+  ],
+  "baseline_source": "D-2 G5 acceptance (3 independent runs, 2026-11-03)",
+  "regression_target_us": 6767,
+  "regression_attribution_us": {
+    "produce_dgkn_chain_transpose_fold": 539,
+    "gn_gate_64_row_subs": 565,
+    "drain_fold": 170,
+    "removed_old_ops": -560
+  },
+  "precision_state": "L0/L1 40 PASS ratio=1.0000, valrange_l dg max_abs 7.8e-3 (cap 1e-2)",
+  "session_baseline_runs_us": [
+    7510.6,
+    7494.2,
+    7506.3
+  ],
+  "notes": "session anchor runs pending; will fill after this-session 3x independent do_bench",
+  "session_baseline_mean_us": 7503.7,
+  "session_anchor_source": "r4_session_baseline.log 2026-11-03T19:01 (pre-interruption session, same D-2 verified kernel state)"
+}

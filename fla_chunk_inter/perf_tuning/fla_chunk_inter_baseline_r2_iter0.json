@@ -1,0 +1,26 @@
+{
+  "operator": "fla_chunk_inter",
+  "round": "R2 (Developer-mode-only continuation, user checkpoint 2026-11-02)",
+  "iteration": "r2_iter0 (session baseline re-measure)",
+  "timestamp": "2026-11-02T20:05+08:00",
+  "bench_shape": "B=1,S=8192,H=64,DK=128,DV=128,chunk=64,scale=1.0,fp32",
+  "metric": "do_bench warmup=20/rep=10/mean/device-side NPU events",
+  "baseline_time_us": 12042.1,
+  "reference_time_us": 12028.0,
+  "reference_source": "R1 final_summary (12015.7/12033.5/12033.4 3-run representative; msprof single-launch 11900.6)",
+  "md5_kernel": "72e7ac7d7a150a5e3579c635a088e3bb",
+  "snapshot": "history_version/fla_chunk_inter_perf_r2_start.py",
+  "precision_status": "pass (R1 terminal state, --level all green at R1 close)",
+  "programming_mode": "Developer (alloc_shared/fragment + auto sync; threads=1)",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_inter.py --level perf",
+  "target_us": 3400,
+  "r1_floor_facts": {
+    "aiv_mte2_busy_us": 4032,
+    "aiv_mte2_bytes_gb": 3.93,
+    "aiv_vec_busy_us": 3042,
+    "aiv_mte3_busy_us": 2455,
+    "aic_busy_us": 5900,
+    "aic_wait_id0_us": 8800,
+    "v_mte2_structural_floor_us": 4180
+  }
+}

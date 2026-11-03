@@ -1,0 +1,48 @@
+{
+  "operator": "fla_chunk_inter",
+  "round": "R2 final state (Developer-mode-only)",
+  "timestamp": "2026-11-02T22:20+08:00",
+  "bench_shape": "B=1,S=8192,H=64,DK=128,DV=128,chunk=64,scale=1.0,fp32",
+  "metric": "do_bench warmup=20/rep=10/mean/device-side NPU events",
+  "r2_entry_us": 12042.1,
+  "r1_reference_us": 12028.0,
+  "final_runs_us": [6777.0, 6755.8, 6767.4],
+  "final_representative_us": 6767.0,
+  "msprof_single_launch_us": 6534.3,
+  "improvement_vs_r1_pct": -43.8,
+  "improvement_vs_stage2_baseline_pct": -65.4,
+  "target_us": 3400,
+  "target_status": "NOT_MET (1.99x over)",
+  "precision_status": "pass (--level all: 51 PASS + 2 Stage-2 documented WARNs, exit 0)",
+  "adopted_chain": [
+    {"iter": "r2_iter1", "opt": "NK-merge task restructure", "gain_pct": -18.5},
+    {"iter": "r2_iter2", "opt": "1-late flag pairing + head-set prime", "gain_pct": -29.4},
+    {"iter": "r2_iter3", "opt": "drain gating op trims (ml2d hoist + ln2 pre-fold)", "gain_pct": -3.6}
+  ],
+  "rolled_back": [
+    {"iter": "r2_iter4", "opt": "do/v/dv load batching", "result": "-2.55% pooled (5/5 pairs positive) < 3% noise threshold"},
+    {"iter": "r2_iter5", "opt": "left-chain-first + batching combo", "result": "+1.9% regression (two sessions)"}
+  ],
+  "final_profile": {
+    "wall_us": 6534.3,
+    "aiv_vec_busy_us": 2502.6,
+    "aiv_mte2_busy_us": 2867.5,
+    "aiv_mte2_bw_gbps_per_aiv": 52.6,
+    "aiv_mte3_busy_us": 1447.2,
+    "aiv_mte3_bw_gbps_per_aiv": 86.7,
+    "engine_overlap_us": 283.0,
+    "aic_busy_sum_us": 4481.0,
+    "aic_wait_id0_us": 2551.8,
+    "aiv_flag_wait_us": 0.0,
+    "per_task_wall_us": 15.94
+  },
+  "floor_accounting": {
+    "v_serial_chain_floor_ms": 6.8,
+    "v_perfect_overlap_floor_ms": 2.87,
+    "c_bound_perfect_overlap_floor_ms": 4.5,
+    "hbm_unique_io_floor_us": 2975,
+    "hbm_81pct_floor_us": 3673
+  },
+  "md5_kernel_post_lint": "see history_version/fla_chunk_inter_perf_r2_iter5_before.py lineage (iter3-adopted state + lint noqa)",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_inter.py --level all"
+}

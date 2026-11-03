@@ -1,0 +1,19 @@
+{
+  "operator": "fla_chunk_inter",
+  "iteration": 0,
+  "timestamp": "2026-11-02T16:30:00+08:00",
+  "metric": "do_bench (warmup=20 / rep=10 / mean / device-side NPU events only; no host-side sync inside benched call)",
+  "shape": {"B": 1, "S": 8192, "H": 64, "DK": 128, "DV": 128, "chunk_size": 64, "scale": 1.0, "dtype": "fp32"},
+  "kernel_time_us": 19469.7,
+  "dispatch_baseline_us": 19556.3,
+  "target_us": 3400,
+  "noise_threshold_pct": 3.0,
+  "grid_tasks": 32768,
+  "tasks_per_core": 1638,
+  "us_per_task": 11.9,
+  "precision_status": "pass (Stage 2: L0/L1 40 pass, L2 8/8 reject, Boundary 2 documented WARN non-blocking)",
+  "programming_mode": "Developer (alloc_shared/fragment, auto sync, threads=1)",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_inter.py --level perf",
+  "hbm_floor_us": 2976,
+  "analysis_note": "11.9us/task x 1638 tasks/core ~= wall; per-task ~128 T.* statements x family-calibrated 0.09-0.15us/op sync overhead ~= 11.5-19us/task -> kernel is op/sync-protocol bound, not bandwidth bound (HBM eff ~15%)"
+}

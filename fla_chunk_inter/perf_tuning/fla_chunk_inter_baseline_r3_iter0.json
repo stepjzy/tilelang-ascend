@@ -1,0 +1,24 @@
+{
+  "campaign": "R3",
+  "operator": "fla_chunk_inter",
+  "date": "2026-11-03",
+  "kernel_md5": "db1d9e8a46a0f38b67520e94315853eb",
+  "state": "r3_start (= R2 final, unchanged)",
+  "bench_shape": "B=1,S=8192,H=64,DK=128,DV=128,chunk=64,scale=1.0,fp32",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_inter.py --level perf",
+  "do_bench_protocol": "warmup=20, rep=10, mean, device-side NPU events only",
+  "baseline_time_us": {
+    "r3_session_anchor_mean": 6719.8,
+    "runs": [6731.7, 6716.1, 6711.6],
+    "r2_archive_reference": 6767.4,
+    "post_recovery_recheck_mean": 6639.1,
+    "runs_post_recovery": [6651.6, 6636.7, 6628.9]
+  },
+  "msprof_device_side_us": 6534.3,
+  "target_us": 3400,
+  "precision": "l0 8/8 + --level all Test Passed (exit 0); 51 PASS + 2 Stage-2 documented WARNs (inherited R2 terminal)",
+  "programming_mode": "Developer (Expert authorized for R3 but all Expert-direction evidence closed; see perf_log R3)",
+  "block_DK": 64,
+  "GRID": 8192,
+  "notes": "R3 anchor session; campaign target <3400us NOT reached; see fla_chunk_inter_final_summary.md for the complete limitation list (user-mandated format)."
+}
