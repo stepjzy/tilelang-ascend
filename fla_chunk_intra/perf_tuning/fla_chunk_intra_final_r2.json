@@ -1,0 +1,37 @@
+{
+  "operator": "fla_chunk_intra",
+  "stage": "3-perf-r2-final",
+  "date": "2026-11-03",
+  "final_snapshot": "history_version/fla_chunk_intra_perf_r2_final.py",
+  "final_md5": "ef253da1d630b062e4f4fe1269bef269",
+  "bench_method": "do_bench: NPU events, warmup=20 rep=10 mean, device-side only (bench_attempt2.py)",
+  "official_runs_4": [
+    {"fwd_chain_us": 10148.2, "bwd_chain_us": 1303.6, "total_us": 11451.8},
+    {"fwd_chain_us": 10170.2, "bwd_chain_us": 1285.6, "total_us": 11455.9},
+    {"fwd_chain_us": 10135.1, "bwd_chain_us": 1272.4, "total_us": 11407.5},
+    {"fwd_chain_us": 10183.8, "bwd_chain_us": 1272.2, "total_us": 11456.0}
+  ],
+  "representative_us": {
+    "fwd": {"k_inter": 3138.6, "k_subst": 2544.8, "k_g": 1205.7, "k_g2": 1066.3, "k_y": 1230.2, "k_ai": 1133.5, "chain": 10159.3},
+    "bwd": {"chain": 1283.5},
+    "total": 11442.8
+  },
+  "r1_final_total_us": 12027.5,
+  "r2_improvement_pct": -4.9,
+  "stage2_baseline_total_us": 19774.3,
+  "cumulative_improvement_pct": -42.1,
+  "precision": "--level all: 90 PASS / 0 FAIL / 0 WARN; ruff clean",
+  "band_verdict": "NOT_IN_BAND (11443 > 10700 upper edge of 10.1-10.7ms)",
+  "adopted_chain": ["R2-#1 k_inter fixed-core task loop + explicit L2 relays + manual 1-late FIX flags (k_inter -12.1%)"],
+  "rolled_back_or_abandoned": [
+    "R2-#2a k_y L0C->GM frag handoff pilot (-1.1~-1.6% sub-threshold; small kernels already at max(C,V) overlap)",
+    "R2-#2b k_inter drain mask-mul (est -0.25ms; UB overflow -> half-split -> deterministic planner hang -> device fault; abandoned per discipline)"
+  ],
+  "floor_accounting": {
+    "kernel_layer": "exhausted for current 8-kernel structure: k_subst 2545us at V-semantic floor (row-recursion RAW, 40 AIV saturated); k_inter 3139us at per-core V bound after fixed-core (msprof wall 3030 = V.sum); k_g/g2/y/ai at max(C,V) overlap limits; bwd 1284us at 803MB@~600GB/s traffic floor",
+    "toolchain_layer": ["one-C-segment-per-kernel -> 8-kernel split + ~4.4GB fwd GM traffic vs 706MB unique IO (826us physical floor unreachable)", "fp32 gemm_v0 broken -> hi/lo 3x gemms + all-ws split pairs", "V per-op issue overhead ~50ns/op (k_subst semantic+issue floor)", "threads=2 falsified (+47%, 40-AIV unreachable)", "planner alias/barrier fragility blocks statement restructuring (3 documented incidents incl. deterministic hang + device fault)"],
+    "residual_micro_items": "k_inter drain mask-mul ~-0.25ms (blocked by planner UB budget + aliasing fragility -- retryable if planner improves)"
+  },
+  "acceptance_recommendation_us": 11500,
+  "acceptance_basis": "11443 measured (4-run band 11408-11456) + noise margin; <=10700 requires planner robustness fixes (~-0.3ms class) or toolchain structural items (much larger); 826us physical floor needs single-kernel fusion support"
+}

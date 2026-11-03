@@ -1,0 +1,41 @@
+{
+  "operator": "fla_chunk_intra",
+  "stage": "3-perf-r1-baseline",
+  "date": "2026-11-03",
+  "snapshot_md5": "d54201649875e50aca0a3f17dfd8a7ce",
+  "snapshot": "history_version/fla_chunk_intra_perf_r1_iter0_before.py",
+  "bench_method": "do_bench: NPU events, warmup=20 rep=10 mean, device-side only (bench_attempt2.py)",
+  "fwd_shape": [1, 8192, 64, 128],
+  "fwd_dtype": "bf16 in / fp32 gate",
+  "bwd_shape": [1, 8192, 8, 128],
+  "bwd_dtype": "fp32",
+  "fwd_kernels_us": {
+    "k_inter": 5164.1,
+    "k_g": 5672.3,
+    "k_g2": 1576.2,
+    "k_y": 2404.8,
+    "k_ai": 1852.6,
+    "sum_of_parts": 16670.0,
+    "chain": 16451.4
+  },
+  "bwd_kernels_us": {
+    "k_stage": 1195.1,
+    "k_gemm": 2088.2,
+    "sum_of_parts": 3283.3,
+    "chain": 3290.5
+  },
+  "total_us": 19741.9,
+  "attempt2_reference_us": 19774.3,
+  "precision_status": "pass (attempt-2 all green: L0 7/7 + L1 9/9 + L2 12/12 reject + Boundary 5 PASS/2 WARN)",
+  "programming_mode": "Developer (threads=1, PASS_CONFIGS auto CV combine/sync/memory planning)",
+  "design_floor_reference": {
+    "unique_io_mb": 1044,
+    "physical_floor_us": 826,
+    "six_kernel_logical_floor_us": [1340, 1650]
+  },
+  "notes": [
+    "fwd chain 16.45ms = 12.3x DESIGN 6-kernel logical floor (1.34ms)",
+    "bwd is 2-kernel v3-2k structure (not DESIGN's 1-kernel): GM staging round trip ~678MB traffic by static count (OpscrM 56MB w + 112MB r(2x per half) + Opscr 159MB w + 159MB r + Fragscr 96MB w + 96MB r)",
+    "fwd per-kernel auto-relay (UB->L1 workspace) static estimate ~96KB/program for k_inter (18 operands hi/lo bf16) + 12KB C->V; total fwd relay ~2.4GB r+w (not in DESIGN 1.36GB model)"
+  ]
+}

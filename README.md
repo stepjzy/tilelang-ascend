@@ -13,6 +13,8 @@
 | fla_wy_fast | 📦 已归档交付 | — | fp32 gemm 损坏下的 fp16 hi/lo 拆分模拟；实测带宽校准推翻标称假设；23.15→11.72ms（-49.4%） |
 | fla_chunk_intra_token_parallel | ⏳ 分支已 push，待提 PR | — | msprof 流水图驱动瓶颈重归因（空闲 Cube 卸载 -49%）；四条直觉瓶颈实测证伪史；分离核 relay 地板论证；19150→1739us（11.0×，目标 370us 经论证物理不可达） |
 | fla_chunk_o | 🔄 PR open | [#1953](https://github.com/tile-ai/tilelang-ascend/pull/1953) | CV 中继型算子的同步协议地板画像法（msprof 消融 + host 分发地板核算）；Developer 模式边界实证；3.285→1.417ms（-57%，目标 1320us 为工具链级地板所封） |
+| fla_chunk_inter | ⏳ 分支已 push，待提 PR | — | "带宽-容量-同步"三重地板完整论证与按证据链交付；NK-merge/1-late flag 结构性重构；threads=2 vid 源码级闭合微实验法；19556→6767us（-65.4%，目标 3400us 低于双结构地板，六项限制清单见 final_summary §3） |
+| fla_chunk_intra | ⏳ 分支已 push，待提 PR | — | 跨核 flag 16 槽硬截断实锤定位法（40 flag 全碰撞 → kernel 边界作 V→C 同步）；逐列循环携带依赖的 masked-GEMM 重表述；roofline 下限驱动的目标重定决策链（540us 物理不可达 → 先实测再定 → 11.44ms 验收 ≈11.5ms）；19774→11443us（-42.1%） |
 
 ## 维护规则
 

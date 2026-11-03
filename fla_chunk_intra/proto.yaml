@@ -1,0 +1,169 @@
+# proto.yaml — fla_chunk_intra 算子接口规格
+#   （KDA intra-chunk：fwd 融合 inter+solve_tril 块逆生成 / bwd intra 梯度）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_chunk_intra.py                       Triton/FLA 参考实现
+#     （语义权威；2 个 kernel：fwd chunk_kda_fwd_kernel_inter_solve_fused +
+#     bwd chunk_kda_bwd_kernel_intra）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_chunk_intra.py
+#   - ref_gpu/fla_chunk_intra_tilelang_gpu_fwd.py      上游 TileLang CUDA fwd
+#     测试样例（代码级迁移起点；Developer 模式 autotune block_DK/threads/
+#     num_stages；含 main() benchmark 配置与 do_bench 口径）
+#     ← tile-ai/tilelang@main examples/kda/chunk_inter_solve_fused.py
+#   - ref_gpu/fla_chunk_intra_tilelang_gpu_bwd.py      上游 TileLang CUDA bwd
+#     测试样例（代码级迁移起点；threads=128, num_stages=0；kernel 输出
+#     dq2/dk2/db2/dg2，host 侧后续 db2.sum(0)+db 与 reverse cumsum 不属 kernel）
+#     ← tile-ai/tilelang@main examples/kda/chunk_bwd_intra.py
+#   - ref_gpu/fla_chunk_intra_cumsum.py                测试输入构造语义参考
+#     （fwd: gk = logsigmoid(randn) 后 chunk_local_cumsum；bwd post: dg2
+#     reverse chunk-local cumsum 的 PyTorch 等价重写依据）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/cumsum.py
+#   - ref_gpu/test_utils_kda.py                       do_bench/compare_tensors
+#     计时与比对口径（warmup=20, rep=10, mean，仅设备侧 kernel 时间）
+# 范围：定长序列（非 varlen），scale=1.0（对齐上游测试样例 main()）；
+#   varlen（cu_seqlens/chunk_indices 二分查找）与 scale≠1 透传不在本次范围。
+#   本算子 = 上述 2 个 kernel（fwd + bwd 各 1 个）；host 侧后处理
+#   （bwd 的 db2.sum(0).add_(db)、reverse chunk_local_cumsum(dg2)）在
+#   wrapper/golden 侧完成，不属 kernel、不计入性能计时（对齐上游测试边界）。
+# 编程模式：Developer（用户明确指定，2026-11-02）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/
+#   precision-standard.md 混合容差 + 双门限，golden = PyTorch 重写参考实现，
+#   用户明确要求；性能验收以精度通过为前置）：
+#   - fwd 输出 Aqk/Akk 均为 bf16：atol 2^-10 (9.77e-4), rtol 2^-6 (1.56e-2),
+#     max_abs_error_limit 1e0, matched_ratio ≥ 0.99（inf/nan 结构比对）
+#   - bwd 输出 dq2/dk2/db2/dg2 均为 fp32：atol 2^-16 (1.53e-5), rtol 2^-10
+#     (9.77e-4), max_abs_error_limit 1e-2, matched_ratio ≥ 0.99
+#   - bwd 比对在上游同款 host 后处理（db2.sum(0)+db、reverse chunk cumsum）
+#     之后进行，golden 后处理与实现侧逐位同构（同 sum/cumsum 语义）
+# 性能目标：fwd + bwd 全部 kernel 纯 Kernel 时间合计 < 540 us；
+#   口径 = 主仓原 GPU 测试样例（对齐 ref_gpu/test_utils_kda.py do_bench：
+#   预热 20 次后重复 10 次取平均，仅设备侧 kernel 执行时间，不含张量构造/
+#   H2D-D2H/JIT/框架开销）；benchmark 配置 = 上游 main()：
+#   - fwd: B=1, S=8192, H=64, DK=128, chunk_size=64, sub_chunk_size=16,
+#     input bf16（q/k/beta）/ gate fp32（gk）/ accum fp32 / output bf16, scale=1.0
+#   - bwd: B=1, S=8192, H=8, DK=128, 全 fp32, chunk_size=64, sub_chunk_size=16,
+#     threads=128（上游）作为初始参考
+operator:
+  name: fla_chunk_intra
+  category: Fusion  # CV 融合：Cube GEMM（tl.dot 语义）+ Vector exp2/掩码/cast
+  formula: |
+    记 chunk CS=64（BT）、sub-chunk SCS=16（BC）、NC=BT/BC=4、scale=1.0。
+    全部公式按 chunk 内（c 固定）描述；gk 为 chunk 内累积 log2 衰减
+    （cumsum 输出），2^(x) = exp2(x)。上游实现 fp32 累加。
+
+    [fwd kernel] chunk_kda_fwd_kernel_inter_solve_fused，grid=(NT, B*H)，
+    每 program 处理一个 (chunk, bh)：NC=4 个 sub-chunk 记 s∈{0..3}，
+    g_n(s) = gk[c*BT + s*BC]（sub-chunk 首行衰减）。
+    (1) off-diagonal 块（s2 > s1，K 维分块累加，BK 循环）：
+        qg_{s2} = q_{s2} ⊙ 2^(g_{s2} − g_n(s2))（行掩码 m_tc 越界置 0）
+        kg_{s2→s1} = k_{s1}ᵀ ⊙ 2^(g_n(s2) − g_{s1})（列方向）
+        Aqk[s2,s1] = Σ_K qg_{s2} · kg_{s2→s1}
+        Akk[s2,s1] = Σ_K (k_{s2} ⊙ 2^(g_{s2} − g_n(s2))) · kg_{s2→s1}
+    (2) Aqk off-diagonal 块 × scale 后写出（bf16）；Akk 块乘
+        β_{s2}（sub-chunk s2 各行 beta）。
+    (3) 对角块：Akk_diag[t, :SCS]（fp32，token_parallel 产物，上游测试
+        用 torch.ones）取严格下三角 A（m_A），前代求解构造单位下三角逆
+        Ai_{ss}（逐行 i：row_i = (−a_i + Σ a_i·Ai) 置行 i；+I）。
+    (4) 合并块逆（4×4 块下双对角递推，全部以 tl.dot 语义）：
+        Ai[s2,s1] = −Ai_{s2,s2}·( Σ_{s1≤m<s2} Akk[s2,m]·Ai[m,s1] )
+        覆盖 (1,0)(2,1)(3,2)(2,0)(3,1)(3,0) 全部下三角块。
+    (5) Akk 全部 16 块（4 对角 + 6×[s2,s1]，含上三角为 0 的 Ai 结构）
+        写出为 Akk_inv（bf16，[B,S,H,BT] 内每 chunk 的 BC 网格）。
+    输出：Aqk（仅 off-diagonal 块写出，对角块由上游测试 Aqk 构造决定）、
+        Akk = 合并块逆。
+
+    [bwd kernel] chunk_kda_bwd_kernel_intra，grid=(NK*NC, NT, B*H)，
+    DK 维分 NK 块（BK=block_DK），每 program 处理 (k-block i_k,
+    sub-chunk i_i, chunk t, bh)，i_ti = t*BT + i_i*BC：
+    (A) 前序块累积（j < i_i）：gn = g[i_ti]；
+        dq2 += dAqk[i_i,j]·(k_j ⊙ 2^(gn − g_j))；
+        dk2 += dAkk[i_i,j]·(k_j ⊙ 2^(gn − g_j))；
+        之后 dq2/dk2 × 2^(g_i − gn)（总衰减 2^(g_i−g_j)）。
+    (B) 对角 sub-chunk 逐列循环 j∈[0, min(BC, T−i_ti))（顺序累加）：
+        dq2 += where(i ≥ j, dAqk[i,j]·k_j·2^(g_i−g_j), 0)
+        dk2 += where(i ≥ j, dAkk[i,j]·k_j·2^(g_i−g_j), 0)
+        db_partial = Σ_K(dk2 ⊙ k)（β 缩放前）；dk2 × β_i。
+    (C) dq2 += dq；写 dq2、db2（按 i_k 分块的 partial）。
+    (D) 后序块累积（j > i_i）：gn' = g[min(i_ti+BC, T)−1]（sub-chunk 末行）；
+        dkt += dAqk[j,i]ᵀ·(q_j ⊙ 2^(g_j − gn')) + dAkk[j,i]ᵀ·((β_j k_j) ⊙
+        2^(g_j − gn'))；之后 dkt × 2^(gn' − g_i)。
+    (E) 对角转置逐列循环 j：dkt += where(i ≤ j, (dAkk[i,j]·β_j k_j +
+        dAqk[i,j]·q_j)·2^(g_j − g_i), 0)。
+    (F) dg2 += (dk2_preβ − dkt) ⊙ k + dg；dk2 += dk + dkt；写 dk2、dg2。
+    输出：dq2 = dq+Δdq、dk2 = dk+Δdk、db2（NK partial）、dg2 = dg+Δdg。
+    host 后处理（非 kernel）：db = db2.sum(0)+db；dg = reverse chunk
+    local cumsum(dg2)。
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: sub_chunk_size
+      type: Int
+      default: 16
+      required: false
+    - name: scale
+      type: Float
+      default: 1.0    # 上游测试样例固定 1.0；fwd kernel 内常量乘
+      required: false
+  inputs:
+    - name: q        # [B, S, H, DK]
+      dtype: [bfloat16, float32]
+    - name: k        # [B, S, H, DK]
+      dtype: [bfloat16, float32]
+    - name: gk       # [B, S, H, DK] chunk 内累积 log2 衰减
+      dtype: [float32]
+    - name: beta     # [B, S, H]
+      dtype: [bfloat16, float32]
+    - name: Akk_diag # [B, S, H, SCS] 对角 sub-chunk 内积（fwd 输入）
+      dtype: [float32]
+    - name: dAqk     # [B, S, H, BT]（bwd 输入）
+      dtype: [bfloat16, float32]
+    - name: dAkk     # [B, S, H, BT]（bwd 输入）
+      dtype: [bfloat16, float32]
+    - name: dq       # [B, S, H, DK] 初始梯度（bwd 输入，增量累加）
+      dtype: [bfloat16, float32]
+    - name: dk       # [B, S, H, DK] 初始梯度（bwd 输入）
+      dtype: [bfloat16, float32]
+    - name: db       # [B, S, H] 初始梯度（bwd 输入）
+      dtype: [bfloat16, float32]
+    - name: dg       # [B, S, H, DK] 初始梯度（bwd 输入）
+      dtype: [float32]
+  outputs:
+    - name: Aqk      # [B, S, H, BT] fwd：off-diagonal 块 × scale
+      dtype: [bfloat16]
+    - name: Akk      # [B, S, H, BT] fwd：4×4 块合并逆（fp32 累加写出）
+      dtype: [bfloat16]
+    - name: dq2      # [B, S, H, DK] bwd
+      dtype: [bfloat16, float32]
+    - name: dk2      # [B, S, H, DK] bwd
+      dtype: [bfloat16, float32]
+    - name: db2      # [NK, B, S, H] bwd（partial，host 后 sum）
+      dtype: [bfloat16, float32]
+    - name: dg2      # [B, S, H, DK] bwd（pre reverse-cumsum）
+      dtype: [float32]
+  schema: >-
+    fla_chunk_intra_fwd(q: [B,S,H,DK], k: [B,S,H,DK], gk: [B,S,H,DK] fp32,
+    beta: [B,S,H], Akk_diag: [B,S,H,SCS] fp32, scale=1.0, chunk_size=64,
+    sub_chunk_size=16) -> (Aqk: [B,S,H,64], Akk: [B,S,H,64])；
+    fla_chunk_intra_bwd(q, k, g: fp32, beta, dAqk: [B,S,H,64], dAkk:
+    [B,S,H,64], dq, dk, db, dg, chunk_size=64, sub_chunk_size=16) ->
+    (dq2, dk2, db2: [NK,B,S,H], dg2)
+benchmark:
+  shape:
+    fwd: {B: 1, S: 8192, H: 64, DK: 128, chunk_size: 64, sub_chunk_size: 16}
+    bwd: {B: 1, S: 8192, H: 8, DK: 128, chunk_size: 64, sub_chunk_size: 16}
+  dtype:
+    fwd: {input: bfloat16, gate: float32, accum: float32, output: bfloat16}
+    bwd: {input: float32, gate: float32, accum: float32, output: float32}
+  perf_target_kernel_us: 540   # fwd + bwd 两 kernel 纯 Kernel 合计 < 540us
+  timing: do_bench(warmup=20, rep=10, mean, device-side only)
+test_alignment: >-
+  测试对齐上游样例（ref_gpu/fla_chunk_intra_tilelang_gpu_{fwd,bwd}.py）：
+  - fwd 输入构造：q/k/beta = randn bf16；gk = logsigmoid(randn fp32) 后
+    chunk 内 cumsum（PyTorch 等价重写）；Akk_diag = torch.ones fp32；
+    Aqk 输出 buffer 上游为 torch.empty（对角块由测试侧约定，golden 以
+    PyTorch 重写实现语义为准并在 DESIGN 中明确对角块比较口径）。
+  - bwd 输入构造：q/k/g/beta/dAqk/dAkk/dq/dk/db/dg = randn fp32（g 未经
+    cumsum）；比对在上游同款 host 后处理后进行。
+  - golden = PyTorch 重写参考实现（两个 kernel 语义 + host 后处理），
+    禁止依赖 Triton/CUDA 运行。

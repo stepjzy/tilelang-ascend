@@ -1,0 +1,29 @@
+{
+  "operator": "fla_chunk_intra",
+  "stage": "3-perf-r1-final",
+  "date": "2026-11-03",
+  "final_snapshot": "history_version/fla_chunk_intra_perf_r1_final.py",
+  "final_md5": "2d0004e056285e76952ef92b7eaa1848",
+  "bench_method": "do_bench: NPU events, warmup=20 rep=10 mean, device-side only (bench_attempt2.py)",
+  "official_runs": {
+    "run1": {"fwd_chain_us": 10762.1, "bwd_chain_us": 1286.9, "total_us": 12049.0},
+    "run2": {"fwd_chain_us": 10621.9, "bwd_chain_us": 1280.9, "total_us": 11902.8},
+    "run3": {"fwd_chain_us": 10792.0, "bwd_chain_us": 1338.8, "total_us": 12130.8}
+  },
+  "representative_us": {
+    "fwd": {"k_inter": 3564.3, "k_subst": 2656.5, "k_g": 1202.2, "k_g2": 1083.6, "k_y": 1235.4, "k_ai": 1138.4, "chain": 10725.3},
+    "bwd": {"k_stage": 672.8, "k_gemm": 845.4, "chain": 1302.2},
+    "total": 12027.5
+  },
+  "baseline_total_us": 19741.9,
+  "improvement_pct": -39.1,
+  "precision": "--level all: 90 PASS / 0 FAIL / 0 WARN (boundary WARN of attempt-2 FIXED: bnd_bwd_decay now PASS)",
+  "adopted_chain": ["iter1 k_inter anchor-free super-GEMM (-31.5%)", "iter2 bwd mid-anchor super-GEMM (-55.5%)", "iter3 fwd pre-split ws direct-read chain (-18.2%)", "iter5 k_g split subst+gemm (-28.5%)"],
+  "rolled_back": ["iter4 k_g ILP interleave (+2.5%)", "iter6 k_g2 threads=2 (+47%)"],
+  "remaining_gap": {
+    "kernel_layer": "k_inter fixed-core task-loop (-1.0~1.3ms est, inter R1-iter2 precedent) + small-kernel L0C->GM frag handoff (-0.3~0.6ms est) -> ~10.1-10.7ms band",
+    "toolchain_layer": "6+2-kernel forced split (one C segment per kernel), fp32 gemm broken (hi/lo x3 everywhere), V per-op issue overhead (serial substitution 2.5ms floor), threads=2 falsified"
+  },
+  "re_target_recommendation_us": 10500,
+  "re_target_basis": "12.03ms measured + verified-identified kernel-layer items (-1.3~1.9ms); <4.2ms implies upstream toolchain fixes"
+}
