@@ -187,7 +187,9 @@ printf '.vscode/\n*.env\n__pycache__/\n' > ../tilelang-dev-journal/.gitignore
 - 技术执行调度 `@tilelang-op-orchestrator`（设计→实现→测试→调优三阶段状态机），
   本 skill 不亲自写 kernel；精度容差与纯 Kernel 计时统一按 Phase 1"口径标准"执行。
   **分设环境下所有验证执行走"分设环境执行模型"**（远程 exec/job，见上文）；
-  沙箱文件组织与过程文档纪律不变。
+  沙箱文件组织与过程文档纪律不变。开发中的错误处理遵循 AGENTS.md 原则 7
+  （调试链：`tilelang-debug-helper` / `tilelang-error-fixer`），禁止一遇错误
+  就全部重写。
 
 ### 环境就绪流程（每次进入验证前）
 
@@ -293,6 +295,10 @@ git worktree add ../tilelang-{op}-pr -b feat/{op}-pr upstream/ascendc_pto
 - 把交付文件 cp 进 worktree，`git add` **只加这两个文件**。
 - 提交信息风格对齐现有 -pr 分支：`[Example] Add {op} operator and test` /
   `[Feature] Implement {op} operator`。
+- **交付前格式检查（强制，push 之前）**：在 -pr worktree 内跑
+  `ruff format --check <交付文件>` 与 `ruff check <交付文件>`，不过则先
+  `ruff format` 修复再提交（CI 的 format-check 挂过两次的真实教训：
+  #1952/#1953 均因格式失败返工；规范细则见 `tilelang-review` skill）。
 - `git push -u origin feat/{op}-pr`。
 - 基线已前移时可先在 worktree 内 `git merge upstream/ascendc_pto` 再 push。
 
@@ -546,9 +552,14 @@ cp 时按下表改名；`history_version/` 与 `perf_tuning/` 内保持沙箱 `{
 | skill | 职责边界 |
 |---|---|
 | 本 skill | 全程编排、三区流转、归档、清理、PR 文稿交付 |
-| tilelang-op-orchestrator | Phase 2 内部的设计→实现→调优技术执行 |
+| tilelang-op-orchestrator | Phase 2 内部的设计→实现→调优技术执行（Stage 状态机） |
+| tilelang-op-design | 写算子的设计层：design.md 生成（模式选型/API 映射/内存层级/Tiling/约束检测），经 analyst（Stage 1）调用 |
+| tilelang-op-develop | 写算子的实现层：从 design.md 提取字段 + examples 参考生成代码，经 developer（Stage 2）调用 |
+| tilelang-op-test-design | 写算子的测试层：L0 门槛计划（Stage 1 场景 A）与 L1/L2/Boundary 扩展（Stage 2 场景 B）；口径标准见其 precision-standard.md |
 | tilelang-op-profiling | 调优深挖的画像技术执行：msprof op 采集、数据归档与统计摘要、性能标准判定（经 orchestrator/perf-tuner 调用；分设约束由本 skill 注入） |
 | tilelang-perf-optimization | 调优深挖的优化技术执行：优化点识别（optimization_log）、逐项实施、效果验证（经 orchestrator/perf-tuner 调用；分设约束由本 skill 注入） |
+| tilelang-debug-helper / tilelang-error-fixer | 开发中的错误诊断（GDB/IR dump/AOT），按 AGENTS.md 原则 7 由 Stage 2 按需调用 |
+| tilelang-review | Phase 3 交付前的格式检查规范（ruff format/check） |
 | tilelang-example-merge | Phase 3 的交付文件合并规范 |
 | tilelang-github-operations | 不参与本流程——PR 由用户网页自行提交，agent 永不代提 |
 | cannlab-cli | 分设环境的远程执行底层（命令规范、结构化输出与安全边界）；本 skill Phase 2 的验证执行依赖它，命令细节按需读其参考文件 |
