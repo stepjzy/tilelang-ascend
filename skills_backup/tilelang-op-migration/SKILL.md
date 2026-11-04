@@ -115,6 +115,14 @@ PR 分支会违反"PR 只收 2 个文件"的上库约束；过程文档留在主
 - 长时间验证一律 job（不占本地连接），**禁止交互式 SSH 长占 NPU**；
 - NPU 已 RUNNING 时不得重复 start。
 
+### 调优类 skill 的分设约束注入（下游兜底）
+
+`tilelang-op-perf-optimization` 与 `tilelang-op-profiling` 的 SKILL.md 仍为单机
+时代写法（msprof/采集命令本地直跑）。**经 orchestrator / perf-tuner 调用它们
+时，其 Step 内一切 msprof / 采集 / kernel 运行命令一律按本节 cannlab 命令映射
+执行**（远程 exec/job + prof 产物 cp 取回 CPU 分析），忽略其文内的本地直跑
+命令字样；两个 skill 本体的全面分设化改造为独立待办。
+
 ## 命名规范（强制统一，禁止自创变体）
 
 | 对象 | 格式 | 正例 | 反例（历史遗留，勿再犯） |
@@ -227,7 +235,10 @@ NPU 环境为空机，需装载项目并构建（约 30~60 分钟，用 job 后�
 ### 流水图驱动的调优深挖（检查点未达标且用户选择"继续调优"时）
 
 （分设环境：msprof 经 cannlab job 远程执行，prof 产物 cp 取回后在 CPU 侧分析；
-同一工作块内的多候选应一次开机批量画像，避免反复启停。）
+同一工作块内的多候选应一次开机批量画像，避免反复启停。画像采集与指标判定的
+技术执行点名 `tilelang-op-profiling`（msprof op 采集/归档摘要/性能标准判定），
+优化点识别与逐项实施点名 `tilelang-perf-optimization`；两者的本地直跑命令一律
+按"调优类 skill 的分设约束注入"节执行。）
 
 下一轮调优**必须以流水图（msprof 管线画像）证据驱动**，禁止无画像盲试；同时
 "kernel 层路线穷尽"的结论必须经地板核算才能宣布：
@@ -536,6 +547,8 @@ cp 时按下表改名；`history_version/` 与 `perf_tuning/` 内保持沙箱 `{
 |---|---|
 | 本 skill | 全程编排、三区流转、归档、清理、PR 文稿交付 |
 | tilelang-op-orchestrator | Phase 2 内部的设计→实现→调优技术执行 |
+| tilelang-op-profiling | 调优深挖的画像技术执行：msprof op 采集、数据归档与统计摘要、性能标准判定（经 orchestrator/perf-tuner 调用；分设约束由本 skill 注入） |
+| tilelang-perf-optimization | 调优深挖的优化技术执行：优化点识别（optimization_log）、逐项实施、效果验证（经 orchestrator/perf-tuner 调用；分设约束由本 skill 注入） |
 | tilelang-example-merge | Phase 3 的交付文件合并规范 |
 | tilelang-github-operations | 不参与本流程——PR 由用户网页自行提交，agent 永不代提 |
 | cannlab-cli | 分设环境的远程执行底层（命令规范、结构化输出与安全边界）；本 skill Phase 2 的验证执行依赖它，命令细节按需读其参考文件 |
