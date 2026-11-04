@@ -97,9 +97,19 @@ PR 分支会违反"PR 只收 2 个文件"的上库约束；过程文档留在主
 输出模式：一次性结果用 `--output json`，实时流用 `--output jsonl`（全局参数必须
 放在子命令之前）。
 
-### 启停与查询纪律（对齐 CANNLab 手册）
+### 启停与查询纪律（自动启停，2026-11 用户授权放宽）
 
-- **`env start` / `env stop` 前必须获得用户明确确认**，说明用途与预计时长；
+- **自动 start**：需要执行验证时直接拉起（`cannlab env start $NPU_ENV` →
+  `env wait` 至 RUNNING），不逐次询问用户；NPU 中途被平台空闲回收/自动关机时，
+  下一次需要自动重新拉起，全程无感知；
+- **自动 stop（带产物自检闸门）**：仅当满足以下两条后才允许自动关机——
+  ① 本工作块全部验证执行完毕（本轮迁移任务不再有排队的验证需求）；
+  ② **产物取回自检通过**（对照红线 11 清单：测试日志/性能 json/msprof 产物
+  均已 cp 回 CPU 沙箱）——自检不通过禁止 stop；
+- **分析间隙不主动关机**：调优会话内的 CPU 侧分析/改码期间不发起 stop，
+  平台 30 分钟空闲自动释放；下次验证自动再拉起；
+- **仍需用户确认的例外**：`cannlab env recover`（关机重启会中断环境内运行中的
+  任务）与 NPU 处于 EXCEPTION 状态时的任何处置；
 - 纯查询用 `cannlab env list` / `env show`（只读不启机）；`exec`/`env inspect`
   类命令做纯查询时必须加 `--no-start`，禁止"看一眼"意外开机；
 - 长时间验证一律 job（不占本地连接），**禁止交互式 SSH 长占 NPU**；
@@ -176,8 +186,9 @@ printf '.vscode/\n*.env\n__pycache__/\n' > ../tilelang-dev-journal/.gitignore
 1. `cannlab whoami` 确认登录——未登录则引导用户执行 `cannlab login --manual`
    （授权链接/回调地址等敏感串不经手 agent）；
 2. `cannlab --output json env list` 确认 NPU 环境存在，记录名称/ID；
-3. 需要执行验证时向用户申请 `env start` 确认（说明用途与预计时长），
-   `cannlab env wait --status RUNNING --timeout 10m $NPU_ENV` 至就绪。
+3. 需要执行验证时**自动拉起**（`env start` + `env wait --status RUNNING
+   --timeout 10m $NPU_ENV`），不逐次询问（见"启停与查询纪律"）；中途被平台
+   自动关机的，下次需要时重新拉起。
 
 ### NPU 环境首次初始化（每环境一次性）
 
@@ -509,8 +520,10 @@ cp 时按下表改名；`history_version/` 与 `perf_tuning/` 内保持沙箱 `{
    `git status` 核对暂存内容。
 8. **调优后性能未达标必须当场中断告知用户并等待决策**——中断点是 Phase 2 出口
    （调优刚结束），不是 Phase 7；不得静默走完归档/清理/交付后才说。
-9. 分设环境下 `cannlab env start` / `env stop` **未经用户确认不得执行**；
+9. NPU 启停为**自动管理**（2026-11 用户授权）：需要时自动 start、掉线自动重拉、
+   本工作块执行完且**产物取回自检通过**后自动 stop（自检不通过禁止 stop）；
    纯查询必须 `--no-start` 或只读命令，禁止意外开机。
+   **例外**：`env recover` 与 EXCEPTION 状态处置仍需用户确认。
 10. **NPU 侧禁止修改代码**（只执行）——一切编辑在 CPU 真源完成，改后重新 sync。
 11. **NPU 上的产出必须当轮取回 CPU**（测试日志/性能数据/msprof 产物）；
     NPU 侧只允许驻留 build/ 等可再生重物。
