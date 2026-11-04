@@ -1,0 +1,79 @@
+=== 上板性能统计摘要 ===
+Requested Kernel: main_kernel
+Resolved Kernel:  main_kernel | Type: mix
+Task Duration(us): min=6673.24 | avg=6673.24 | max=6673.24 | samples=1
+BlockDim: 20..20
+Freq(avg): 1800/1800
+
+--- PipeUtilization (AIV, 20 timed subcores) ---
+                                  min        avg        max
+  aiv_time(us)              6588.67    6623.20    6666.85
+  计时行耗时分布: p50=6620.93us | p90=6661.35us | max=6666.85us
+  工作计数证据（不等同于有效任务核）: FLOP 计数非零=20/20 | GM 搬运非零=20/20
+  vec_ratio%                  34.10      34.10      34.10
+  scalar_ratio%               64.22      64.82      65.48
+  mte2_ratio%                 44.93      45.33      46.04
+  mte3_ratio%                 21.52      22.16      22.94
+  mte2_active_bw               53.1       54.0       54.5    (GB/s)
+  mte3_active_bw               81.9       84.8       87.4    (GB/s)
+  SCALAR 子类 (aiv, avg): single: 75.86us | dual: 239.62us | mte2_stall: 579.45us | mte3_stall: 473.63us | vec_stall: 5539.09us | wait_ib: 0.12us
+
+--- PipeUtilization (AIC, 20 timed subcores) ---
+                                  min        avg        max
+  aic_time(us)              6591.62    6626.17    6670.44
+  计时行耗时分布: p50=6623.73us | p90=6664.78us | max=6670.44us
+  工作计数证据（不等同于有效任务核）: FLOP 计数非零=20/20 | GM 搬运非零=20/20
+  cube_ratio%                 14.04      14.04      14.04
+  scalar_ratio%               16.85      17.78      18.97
+  mte1_ratio%                 18.48      18.48      18.48
+  mte2_ratio%                 15.33      18.34      22.09
+  fixpipe_ratio%              11.49      12.83      14.35
+  mte3_active_bw         11465692.0 11465692.0 11465692.0    (GB/s)
+  fixpipe_active_bw            52.4       59.1       65.4    (GB/s)
+  SCALAR 子类 (aic, avg): single: 98.46us | dual: 174.11us | mte1_stall: 3243.52us | wait_ib: 1.63us
+
+--- 关键路径与头开销 ---
+  计时子核耗时口径: max(AIV, AIC)
+  Task Duration(avg): 6673.24us | 关键路径: 6670.44us | 头开销: 2.81us (0.0%)
+
+--- Memory ---
+  GM→UB: 3423630.0KB total (171181.5KB/profiler row), BW usage: 11.12%
+  UB→GM: 2630400.0KB total (131520.0KB/profiler row), BW usage: 10.06%
+  GM→L1: 1841280.0KB total (92064.0KB/profiler row), BW usage: 4.98%
+  主存读取: 5264932.5KB total
+  主存写入: 3697980.0KB total
+  Avg MTE2 transfer: 13.43KB (254880 instructions total)
+  GM→UB avg BW: 24.46 GB/s
+  UB→GM avg BW: 18.80 GB/s
+
+--- MemoryUB ---
+  UB read BW (vector): avg=110.4 GB/s
+  UB write BW (vector): avg=73.8 GB/s
+
+--- MemoryL0 ---
+  L0A read BW: 22.6 GB/s
+  L0A write BW: 22.6 GB/s
+  L0B read BW: 90.2 GB/s
+  L0B write BW: 22.6 GB/s
+  L0C read BW (cube): 15.0 GB/s
+  L0C write BW (cube): 22.6 GB/s
+
+--- L2Cache ---
+  AIV: total_hit: avg=43.1% (min=43.0%, max=43.1%) | read_hit: avg=34.7% (min=34.7%, max=34.8%) | write_hit: avg=76.5% (min=76.5%, max=76.5%)
+  AIV write cache: hit=5228800 miss=1610260
+  AIC: total_hit: avg=96.9% (min=96.9%, max=96.9%) | read_hit: avg=100.0% (min=100.0%, max=100.0%) | write_hit: avg=79.6% (min=79.6%, max=79.6%)
+  AIC write cache: hit=2093312 miss=537108
+
+--- ResourceConflict ---
+  AIV conflicts: vec_total_cflt: 12.61% | bankgroup_cflt: 9.26% | bank_cflt: 3.35%
+  AIV waits: vec_wait: 65.57% | mte2_wait: 68.45% | mte3_wait: 62.85%
+  AIC waits: cube_wait: 53.20% | mte1_wait: 46.72% | mte2_wait: 52.46%
+
+--- ArithmeticUtilization ---
+  AIV: vec_fp32: 24.1% | vec_misc: 2.2% | vec_fops: 98903680/timed row
+  AIC: cube_fp16: 14.0% | cube_fops: 80805888/timed row
+
+--- 原始数据位置 ---
+  CSV 文件: /mnt/workspace/gitCode/skybasejzy/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_inter_profiling_final_npu/
+  归档文件保持 msprof 原始内容；summary.txt 仅统计 Resolved Kernel。
+  如需逐核详情，请读取对应 CSV 文件并继续使用同一 kernel 过滤条件。

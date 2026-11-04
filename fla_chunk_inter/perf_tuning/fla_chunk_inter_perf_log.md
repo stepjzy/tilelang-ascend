@@ -409,3 +409,19 @@ R3 终态（= R2 终态逐位一致，R2 已核查项承继）：
 | mul+add 未融合 | ⚠️ 有意保留（R3 iter2 实证 mul_add_dst 精度缺陷，CANN 头文件证据，承继） |
 | 纯 AIV memory bound 未流水/双 buffer | ⚠️ 有意保留（R2/R3 UB 196KB 容量锁实证，承继；R4-4 中继读融合为该锁内的语句级缓解） |
 | 其余项 | ✓ 承继 R3 终表判定（fixed-core/手动 flag/tile 尺寸/CV overlap/循环内归约/误分核/mask fallback） |
+
+## R-EV 分设环境重验证（2026-11-05，NPU env DevEnvC_DCbyi_npu）
+
+| 项 | 新环境实测 | 原环境对照 |
+|---|---|---|
+| do_bench（warmup20/rep10/mean/仅设备侧） | **6884.7 us** | 6868.3 us（+0.24%，噪声内） |
+| msprof op Task Duration（单 launch） | **6673.2 us** | 6534.3us→R4 后未单测（同带） |
+| 满频 / BlockDim / mte2 引擎界 | 1800/1800 / 20 / 54 GB/s | 同 |
+| 精度 --level all | 全绿（40 PASS ratio=1.0000） | 同 |
+
+- 画像产物：fla_chunk_inter_opprof_final_npu_opprof/（CSV 原始，2.2MB）+
+  fla_chunk_inter_prof_final_npu.tar.gz（Insight PROF）+
+  fla_chunk_inter_profiling_final_npu/（perf_summary 归档含 summary.txt/metadata）
+- 基线轮画像不可采集（attempt1 新环境上下文崩溃，见 debug_log Attempt R-EV）；
+  基线 19556.3us 沿用原环境实测。
+- 结论：交付物零改动；性能/精度结论跨环境确认。

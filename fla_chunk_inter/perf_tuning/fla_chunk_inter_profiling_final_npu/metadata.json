@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-11-04T16:53:10.756428+00:00",
+  "collection_method": "msprof op",
+  "profile_input_root": "/tmp/opencode/prof_back/final/opprof/OPPROF_20261105004500_UKPUBOEYVJVGTJLR",
+  "profile_input_dir": "/tmp/opencode/prof_back/final/opprof/OPPROF_20261105004500_UKPUBOEYVJVGTJLR",
+  "entry": "examples_experiment/dsa_sparse_finetune/fla_chunk_inter_prof_probe.py",
+  "workdir": "/mnt/workspace/tilelang-ascend",
+  "command": "cannlab job: env -u ASCEND_RT_VISIBLE_DEVICES msprof op --warm-up=10 --launch-count=1 --output=/mnt/workspace/prof_out/final/opprof --kernel-name=main_kernel python examples_experiment/dsa_sparse_finetune/fla_chunk_inter_prof_probe.py (NPU env DevEnvC_DCbyi_npu, 2026-11-05)",
+  "case_id": "bench_shape_fp32_1x8192x64x128x128",
+  "case_sha256": null,
+  "target": "ascendc",
+  "device": "0",
+  "requested_kernel": "main_kernel",
+  "resolved_kernel": "main_kernel",
+  "warm_up": 10,
+  "launch_count": 1,
+  "source_sha256": "f784b3345ba2dba83b9f3199f9e70230b1e861172cd8232fc59c57152e18089c",
+  "time_unit": "us",
+  "archived_csvs": [
+    "OpBasicInfo.csv",
+    "PipeUtilization.csv",
+    "ArithmeticUtilization.csv",
+    "Memory.csv",
+    "MemoryL0.csv",
+    "MemoryUB.csv",
+    "L2Cache.csv",
+    "ResourceConflictRatio.csv"
+  ],
+  "missing_optional_csvs": []
+}
