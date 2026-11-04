@@ -224,9 +224,16 @@ NPU 环境为空机，需装载项目并构建（约 30~60 分钟，用 job 后�
     曾因此未随首轮归档丢失，仅靠 indexer_bwd 会话归档的共享副本才找回，2026-10-22
     拆分回迁）——共享目录下也必须按 `{op}` 前缀各建各的
    - `perf_tuning/{op}_*`：基线、消融、final_summary（含量化结论与口径）。
-     **msprof 采集的完整 OPPROF 目录按轮次留存**（含 `dump/` 子目录——MindStudio
-     Insight 图形化复盘的依赖；实测单轮 ~2MB，全轮留存无体积压力），禁止只留
-     summary 丢弃原始目录——终态归档进 journal 供后续用 MindStudio 学习
+     **画像双口径采集**（msprof 两种模式、用途不同，不可互替）：
+     ① `msprof op`（算子级，`OPPROF_*` 目录）——**agent CLI 读数口径**：CSV 逐
+       pipe 统计（perf_summary.py 的输入），每轮必采、按轮次全量留存（单轮
+       ~2MB，含 dump/），禁止只留 summary 丢弃原始目录；
+     ② `msprof`（应用级，`PROF_*` 目录，含 mindstudio_profiler.db）——
+       **MindStudio Insight 图形化口径**（Timeline 时间线，用户看图）：
+       **基线轮与终态轮必采**，重大采纳轮可选。
+     ⚠️ 格式不可混用：Insight 只认 PROF 目录——拿 OPPROF 打开会报
+     "No Parsable files found"（CSV 无 db/json，Insight 无法解析）；agent
+     读数用 OPPROF 的 CSV，用户看图用 PROF 的 Timeline。
    - `history_version/{op}_*`：只在"方案转折点"存快照（回退前存档）
 - **红线**：主仓零 commit；`ref_gpu/` 只读。
 - **性能达标检查点（调优一结束即判，未达标立即中断）**：调优（orchestrator
@@ -235,10 +242,11 @@ NPU 环境为空机，需装载项目并构建（约 30~60 分钟，用 job 后�
   - **未达标 → 立即中断流程并告知用户（不等归档/清理/交付）**：当前值 vs 目标值、
     差距倍数、根因（硬件物理不可达论证 / 工具链限制清单）、已尝试无收益的优化清单；
     **等待用户决策（五选一）后再继续**：继续交付 / 继续调优 / 调整目标 / 终止 /
-    **先看当前算子的流水图再决策**——选末项时，agent 将最新（或关键）轮次的
-    OPPROF 完整目录路径移交用户并附 MindStudio Insight 打开指引，同时自行输出
-    该轮的图形化解读（各 pipe 占用率读数、stall 分解、瓶颈归因），用户看完
-    图后回到四选一；用户表态前不得进入 Phase 3。设计期（Stage 1）发现目标物理
+    **先看当前算子的流水图再决策**——选末项时，agent 先对当前实现补采一版
+    应用级 `msprof`（`PROF_*` 目录，Insight 的唯一可用输入；该轮若恰为关键轮
+    且已有 PROF 则直接复用），取回并移交路径 + MindStudio Insight 打开指引，
+    同时自行输出 OPPROF CSV 的读数解读（各 pipe 占用率、stall 分解、瓶颈
+    归因），用户看完图后回到四选一；用户表态前不得进入 Phase 3。设计期（Stage 1）发现目标物理
     不可达时同理，当场中断询问。
 
 ### 流水图驱动的调优深挖（检查点未达标且用户选择"继续调优"时）
@@ -355,7 +363,8 @@ cp 时按下表改名；`history_version/` 与 `perf_tuning/` 内保持沙箱 `{
 | 级别 | 内容 | 处置 |
 |---|---|---|
 | 必留 | DESIGN（含被否 rev）、debug_log、perf_tuning/*.md、ref_gpu 源、proto、impl 终态 | 全部归档 |
-| 必留 | **perf_tuning 内 msprof 原始 OPPROF_* 目录（含 dump/）**——供 MindStudio Insight 打开复盘 Timeline；沙箱清理后 journal 是唯一存续处 | 按轮次全量归档；护栏：单算子 profiling 总量 >100MB 时整目录压缩 tar.gz（单包须 <100MB，GitHub 单文件硬限），仍超则按"基线轮/重大采纳轮/终态轮"保留关键轮并在 INDEX 注明 |
+| 必留 | **perf_tuning 内 `msprof op` 的 OPPROF_* 目录（含 dump/）**——agent CLI 读数口径的原始数据；沙箱清理后 journal 是唯一存续处 | 按轮次全量归档；护栏：单算子该类总量 >100MB 时压缩 tar.gz（单包 <100MB，GitHub 单文件硬限），仍超则保关键轮并在 INDEX 注明 |
+| 必留 | **关键轮的 `msprof` 应用级 PROF_* 目录**（基线轮 + 终态轮；含 mindstudio_profiler.db）——MindStudio Insight 图形化复盘的唯一可用格式 | 归档前压缩 tar.gz（单包 <100MB）；PROF 体积较大，超限时与用户确认保留范围 |
 | 选留 | perf_tuning/*.json（仅被 md 引用者）、history_version/*.py（仅方案转折点） | 引用关系不明时宁多勿少 |
 | 不留 | .orchestrator_state*、.stage_briefs/、backend_verify/、__pycache__、缓存 | 过程已沉淀在 md，原始态无学习价值 |
 
@@ -464,8 +473,9 @@ cp 时按下表改名；`history_version/` 与 `perf_tuning/` 内保持沙箱 `{
 3. debug_log.md（40min）→ 核心坑：<坑列表>
 4. perf_tuning/final_summary（30min）→ 基线→最终 <改善幅度> 怎么来的
 5. history_version/（30min）→ 被否决的 <路线> 差在哪
-6. perf_tuning/**/OPPROF_*（用 MindStudio Insight 打开）→ 图形化复盘各轮
-   Timeline/pipe 占用，对照 md 结论验证瓶颈归因（NPU 环境同代 CANN 版本）
+6. perf_tuning/**/PROF_*（关键轮，解压后用 MindStudio Insight 打开）→ 图形化
+   复盘基线/终态的 Timeline 与 pipe 占用，对照 md 结论验证瓶颈归因；
+   OPPROF_*/ 为 CSV 数字口径（Excel/脚本查看），Insight 打不开属正常
 ## 三大关键决策
 1. <决策 + 为什么> 2. ... 3. ...
 ## 交付物
