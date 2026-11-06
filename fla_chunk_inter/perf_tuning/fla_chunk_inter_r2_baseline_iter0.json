@@ -1,0 +1,32 @@
+{
+  "round": 2,
+  "iteration": 0,
+  "date": "2026-11-05T11:15+08:00",
+  "operator": "fla_chunk_inter",
+  "baseline_time_us": 6810.9,
+  "baseline_recheck_us": 6833.4,
+  "baseline_source": "Stage 2 交付基线（do_bench warmup=20/rep=10/mean/仅设备侧，cannlab exec NPU 实测）",
+  "msprof_single_launch_us": 6762.2,
+  "msprof_source": "本轮 Stage 3 OPPROF iter0（msprof op --warm-up=10 --launch-count=1，OpBasicInfo.csv Task Duration）",
+  "test_shape": [1, 8192, 64, 128, 128],
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_inter.py --level bench",
+  "precision_status": "pass（Stage 2 全量 44/44 PASS，gate 前置满足）",
+  "programming_mode": "Developer（threads=1, MIX_AIC_1_1, AUTO_CV_SYNC + 手动 1-late flag slot 10）",
+  "kernel_md5": "bdd32aedf38d837ae73a8ad56fc9fbdd",
+  "oppopf_floor_claims_recheck": {
+    "full_freq": "Current Freq 1800 = Rated 1800（本轮实测，上轮主张成立）",
+    "core_balance": "20 核 aic_time 6235~6759us（尾核 striped 分配效应，带内极差 1.6%；上轮主张成立）",
+    "v_mte2_engine_bound": "aiv_mte2_active_bw 52.1 GB/s（上轮界 47-54 GB/s 复测成立）",
+    "mte2_byte_floor": "GM_to_UB 171181.5KB / 411 任务 = 416.3KB/task（上轮 416KB 主张精确复测成立）",
+    "v_serial_chain_signature": "mte2 3133 + vec 2275 + mte3 1473 = 6881us ≈ wall 6744us（UB 196KB 强制串行，上轮主张成立；aiv_scalar_vector_stall 5822us 同签名）",
+    "hbm_unique_io_eff": "3.758GB / 6762.2us = 556.4 GB/s = 1263 的 44.1%（上轮 44-45% 复测成立）",
+    "c_busy_us": "cube 937.1 + mte1 1233.0 + mte2 1098.2 + fixpipe 791.1 + scalar 1156.9 = 5216.3us（12.7us/task，77% busy；C 非 wall，等 V 中继 scalar_wait_id0 2159.2us）",
+    "hbm_physical_floor_us": "2976 @100% / 3673 @81%（设备常数，与上轮一致）"
+  },
+  "upstream_lock_recheck": {
+    "launch_form": "codegen_ascend.cc PreFunctionBody 仍仅 MIX_AIC_1_1/1_2（本轮 clone@463c234c 源码复核，上轮限制 4 成立）",
+    "vid_fold_set": "ascend_vid_reduction.cc tile_ops 折半集仍不含 tl.ascend_broadcast（上轮限制 1 关键证据成立，threads=2 路径仍封闭）",
+    "tile_sub_dtype": "ascend_tile.py sub 文档要求 all tensor operands share the same dtype（split 4-op 为 API/精度最小形态，3-op 化封堵）"
+  },
+  "note": "iter0 基线画像轮：双口径采集完成，全部上轮地板主张在新环境复测成立。优化立项 = iter4 家族（批处理装载）独立复测。"
+}

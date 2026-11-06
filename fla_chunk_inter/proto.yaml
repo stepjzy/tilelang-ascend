@@ -1,4 +1,13 @@
-# proto.yaml — fla_chunk_inter 算子接口规格（KDA chunked 反传 inter-chunk 梯度，单 kernel）
+# proto.yaml — fla_chunk_inter 算子接口规格（第二轮：分设环境全量重迁移，2026-11-05）
+# 本轮范围（用户决策 2026-11-05）：完整重走 orchestrator 状态机（Stage 1 重新设计 →
+#   Stage 2 从零实现 → Stage 3 对 3400us 原指标重跑调优战役），上一轮归档证据链作为
+#   领域知识注入（非白纸）。全部 kernel 验证经 cannlab 远程驱动 NPU 环境执行。
+# 执行环境：CPU 真源 = 本机（编辑/文档/git）；NPU 执行器 = DevEnvC_DCbyi_npu
+#   （1×910B3, 22vCPU/76GiB），cannlab CLI 远程 exec/job，基线对账 commit 见 debug_log。
+# 本轮新增硬设计约束（上一轮 D-1/D-2 实证教训，见 journal debug_log）：
+#   禁止 T.reduce_sum / T.tile.broadcast（触发规划器注入 scratch，其 UB 打包随
+#   编译上下文翻转且存在非法放置 → 交付级崩溃）；归约用折叠树 / C 侧 gemm 对角化 /
+#   转置+行展开等无 scratch 形式。首版实现即须满足此约束。
 # 迁移来源（已冻结 ref_gpu/，只读）：
 #   - ref_gpu/fla_chunk_inter.py                 Triton/FLA 参考实现（语义权威）
 #     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_chunk_inter.py

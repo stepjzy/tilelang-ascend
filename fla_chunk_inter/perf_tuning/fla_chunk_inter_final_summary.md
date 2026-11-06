@@ -241,3 +241,106 @@ op 时的形态（工具链修复 planner 指针序后可回收 ~500us 级，见
 - 红线终检：终态 kernel 两 shape 类（bDK=64/32）生成 C grep
   tmp_ub/Broadcast/reduce_2d/reduce_sum/sharedTmp/scratch/WholeReduce 均 **0 命中**。
 - 交付件保持未跟踪工作树文件（agent 不 commit，用户自行提 PR）。
+
+---
+
+## 第二轮（分设环境全量重迁移）
+
+> 环境：**分设（CPU 真源本机 + NPU 执行器 DevEnvC_DCbyi_npu，1×910B3，cannlab 远程驱动）**；
+> tilelang clone@463c234c + 构建 0.1.4+463c234c ｜ R2 战役日期：2026-11-05
+> 计时口径与第一轮一致：do_bench（warmup=20/rep=10/mean/仅设备侧 NPU 事件）；OPPROF（msprof op
+> 单 launch，OpBasicInfo Task Duration）与应用级 PROF（msprof --task-time=on --aic-mode=task-based
+> --aic-metrics=PipeUtilization，稳态 launch 均值）交叉验证。目标沿用 **<3400us**。
+> 本轮性质：用户决策的全量重迁移（Stage 1-3 完整重走、kernel 从 DESIGN 从零重写），第一轮实证
+> 结论作为领域知识注入 DESIGN 但代码零复制；本章节为 R2 收官记录，第一轮报告（上文 R3/R4 段）
+> 原样保留。
+
+### R2.0 结论速览
+
+| 项 | R1 终态（合设档案） | R2 Stage 2 交付 | **R2 Stage 3 终态** |
+|---|---|---|---|
+| do_bench 代表值 | 6868.3 us | 6810.9 us（首跑即贴 R1 终态结构） | **6741.8 us**（3 次独立 6734.4/6749.8/6741.3） |
+| OPPROF 单 launch | 6534.3 us（R3 画像） | 6762.2 us | **6502.7 us** |
+| 应用级 PROF 稳态 | — | 6775.8 us（基线轮） | **6657.2 us**（终态轮新采） |
+| vs 目标 <3400 us | 超 2.02× | 超 2.00× | **超 1.91~1.98×，仍未达标** |
+| 精度 | --level all 全绿 | 44/44 全绿 | **--level all Test Passed（exit 0）收官复验** |
+| 采纳链 | R4 三项 | — | **R2 一项**（iter1 装载批处理，-2.40% A/B） |
+| md5 | 703d5914 | 738a0980 之前的修复态 | **738a0980**（终态） |
+
+R2 Stage 3 净效果：6810.9 → 6741.8 us（do_bench 口径 **-1.02%**）。重排家族 6 变体全谱证伪后
+3 连击收官；kernel 墙 = 双墙锁步（aic 6452.1 / aiv 6448.9，逐核差 +2.15~+4.34us 全为正）。
+
+### R2.1 战役记录（详见 perf_tuning/fla_chunk_inter_r2_perf_log.md）
+
+| 轮 | 内容 | A/B（同会话 3+3 do_bench） | 判定 |
+|---|---|---|---|
+| iter0 | 基线双口径画像；上轮地板主张全部复测成立（满频、mte2 引擎界、V 串行链签名、C busy、HBM） | — | 画像轮 |
+| iter1 | **do/v/dv 三装载连发（mte2 突发）+ split 链集中后置**（R1 R4-4 家族精确复刻，独立环境复测） | 6864.7→6699.8（**-2.40%**，3/3 方向正；跨环境合并 8/8 方向一致，区间完全不交叠） | **采纳**（证据条款，对齐 R4-3/R4-4 先例；锚点 6736.7 do_bench / 6502.7 OPPROF） |
+| iter2 | do 装载+split+relay 前移（右链前；最小重排变体） | 6643.2→6928.0（**+4.29%**，跨会话 6/6 劣化；3 版候选方过 UB 196KB 预算，实锤 razor 边界） | 回滚 |
+| iter3 | C 消费序重排（右中继先读 + dgm 组先算 + L1 slab 免重读；同步点计数 1:1 硬约束预检） | 6633.7→6680.1（**+0.70%**，3/3 劣化） | 回滚 |
+| iter4 | 左 split 逆序（dvn→v→do）+ C 消费同逆序（dw→dk→dq）——重排家族最后变体 | 6711.0→6710.8（**-0.00%** 亚噪声，方向不一致） | 回滚；**3 连击收官** |
+
+过程事故（学习点，详见 perf_log 各轮条目）：iter2 候选 3 版迭代才过编译（独立 t_* scratch 爆
+UB → 语句级 if/else 作用域 → 三元表达式）；R2 探针首版 sys.path 事故（加 perf_tuning/ 自身而非
+op 根目录）。精度事故为零：重排家族每轮 A/B 内嵌 SPOT 4 输出对拍全 PASS（R1 iter6a 前科下的
+标准自证），主实现全程未被非采纳候选触碰。
+
+### R2.2 终态精度（收官门禁）
+
+`python test_fla_chunk_inter.py --level all` → **Test Passed!（exit 0）**：L0 8/8 + L1 36/36 全
+[PRECISION_PASS]（ratio 全 1.000000，最低 0.999939）；L2 13/13 正确拒绝；Boundary WARN 集与
+Stage 2 基线逐值一致（bnd_g_extreme dk/dg + bnd_operand_over65504 ×4，DESIGN §10.3 预期）。
+4 输出全量 max_abs 上界 3.906e-03 ≪ 1e-2 帽（~2.6× 余量）。
+
+### R2.3 限制清单复验结论（R1 §3 六项，逐项在分设环境复核）
+
+| 限制 | R2 复验证据 | 结论 |
+|---|---|---|
+| 1. threads=2 vid 折半集不含 tl.ascend_broadcast | iter0 源码复核（clone@463c234c）：折半集与 R1 一致；threads=2 仍封闭 | **成立** |
+| 2. UB 196KB 容量强制串行 | iter2 候选 +32KB 即爆（TVMError 32768>15616）；V vec_stall 5338.1us；串行链 6571≈墙 | **成立**（架构常数） |
+| 3. C 消费链 GM 中继（无片上直连） | C busy 5507（13.44us/task）与 V 锁步；iter3/4 C 侧重排全无效（吸收型 slack 定理实证） | **成立** |
+| 4. MIX 形态仅 1_1/1_2（grid=40 无效） | codegen_ascend.cc:858-860 复核无变化 | **成立** |
+| 5. 目标隐含 88% HBM 唯一 IO 效率 | 终态 577.7GB/s = 45.8%（vs 1261GB/s）；家族实证最佳 81% 仍未触及 | **成立** |
+| 6. 工具链指令/规划器缺陷族 | mul_add_dst 受限标注 / in-place 崩溃 / reduce_2d [64,64] / planner 别名——R2 未触碰（家族政策承继） | **成立** |
+
+**综合判定与 R1 §3.2 一致：3400us 落在"双侧全 Expert 手写波次"理论 razor 边缘内、现实置信区间外；
+每条通往物理界（2980us）的路径均被 ≥2 项独立上游修复或 razor-edge 装配条件卡死。R2 重排家族
+全谱证伪 + 装载批处理（R1 iter4 方向）在独立环境复测采纳，进一步确认剩余差距为结构限制而非
+实现层问题。**
+
+### R2.4 地板核算（新环境终版数字；iter1 采纳态 OPPROF，20 核均值，满频 1800/1800）
+
+| 项 | 数值 |
+|---|---|
+| AIC busy（cube/mte1/mte2/fixpipe/scalar） | 937.1 / 1233.0 / 1258.9 / 879.0 / 1199.1 us → 合计 **5507.0**（85.3% aic_wall，13.44us/task） |
+| AIV 串行链（mte2/vec/mte3） | 2880.4 / 2237.5 / 1452.8 us → 合计 **6570.7** ≈ aiv_wall（16.04us/task） |
+| 双墙锁步 | aic 6452.1 / aiv 6448.9，**逐核差 +2.15~+4.34us 全为正**；C/V 等待均为吸收型 slack（iter2/3/4 实证） |
+| V-mte2 引擎界与字节地板 | 416.3KB/task（结构必需）× 8192 task；active_bw 56.7GB/s（R1 界 47-54 上沿）→ **~2.88ms 单引擎即占墙 44.7%** |
+| HBM 唯一 IO | 3.758GB / 6502.7us = **577.7GB/s = 45.8%**（vs 1261GB/s）；引擎级总流量 8.547GB，L2 命中 ~97% |
+| 纯带宽物理界 | 3.758GB / 1261GB/s = **2980us** |
+| vs 3400us 差距 | do_bench 6741.8 → **超 1.98×**；OPPROF 6502.7 → 超 1.91×；分解 = V-mte2（字节地板×引擎界）+ V-vec（UB 串行）+ V-mte3（中继+写出）+ C busy 锁步（fp16 hi/lo 3× 放大），详 perf_log 终态节 E |
+
+### R2.5 产出文件（perf_tuning/，fla_chunk_inter_r2_ 前缀 + 本报告）
+
+- fla_chunk_inter_r2_perf_log.md（iter0-4 + 终态节：双口径、地板核算表、战役判定）
+- fla_chunk_inter_r2_baseline_iter0.json / fla_chunk_inter_r2_probe.py
+- fla_chunk_inter_r2_ab_iter{1..4}.py + fla_chunk_inter_r2_iter{1..4}_candidate.py
+  （iter3/4 A/B 含内嵌 SPOT 对拍；iter2 候选保留 3 版编译事故链中可编译版）
+- fla_chunk_inter_r2_ab_iter4_run.log（iter4 job 记录）
+- fla_chunk_inter_r2_opprof_iter{0,1}/（OPPROF CSV：基线/终态——终态=iter1 采纳态，无新采纳故复用）
+- fla_chunk_inter_r2_prof_baseline.tar.gz / **fla_chunk_inter_r2_prof_final.tar.gz**（应用级 PROF 基线/终态）
+- ../history_version/fla_chunk_inter_perf_r2_iter{1,2,4}_before.py（改前快照链）
+- 终态主实现 ../fla_chunk_inter.py（**md5 738a0980** = iter1 采纳态）+ ../debug_log_fla_chunk_inter.md（含 Stage 3 收官 Attempt）
+
+### R2.6 对上游的建议（承继 R1 §6，R2 无新增方向）
+
+第一轮四条建议（threads=2 vid 三项修复 / V↔C 片上直连 / memory-planner 别名感知同步 /
+mul_add_dst 与 in-place 修复）在 R2 独立环境复测下全部维持；本轮新增实证加强：**装载批处理
+（mte2 突发）家族收益跨环境可复现（8/8 方向一致），修复 planner 别名后该家族可重开**。
+
+---
+
+**R2 战役判定：目标 3400us 未达成（终态 6741.8us do_bench / 6502.7us OPPROF，超 1.91~1.98×）
+→ [PERF_INCOMPLETE]。根因 = R1 六项限制清单分设环境逐项复验全部成立（工具链/架构限制）；
+R2 增量空间（语序重排族）已全谱探索闭合（6 变体：1 采纳 + 5 证伪），净收益 -1.02%。
+精度门禁全绿（--level all Test Passed），终态 kernel 可交付。**

@@ -1,0 +1,34 @@
+=== 收官 job 01a1ab46（request-id: prof-fla_chunk_inter-r2-final）运行记录 ===
+env: DevEnvC_DCbyi_npu (1x 910B3, clone@463c234c)
+status: succeeded, exit 0, 289s (2026-11-05T10:34:40Z ~ 10:39:29Z)
+kernel: fla_chunk_inter.py = iter1 采纳态 (md5 738a0980)
+
+=== STEP1: precision gate --level all ===
+GOLDEN-SELFCHECK: PASS (einsum-vs-matmul bitwise, dgk fp64 reassociation)
+L0+L1: 44/44 [PRECISION_PASS]（ratio 全 1.000000，最低 0.999939 = l1_valrange_l dk）
+L2: 13/13 正确拒绝；Boundary: 17 输出 PASS + 6 WARN（bnd_g_extreme dk/dg + bnd_operand_over65504 ×4，与 Stage 2 逐值一致）
+Test Passed!
+STEP1_EXIT=0
+
+=== STEP2: official do_bench x3 independent（warmup=20/rep=10/mean/仅设备侧）===
+[BENCH] perf_bench shape=(1,8192,64,128,128) scale=1.0 device time = 6.734 ms (6734.4 us)
+[BENCH] perf_bench shape=(1,8192,64,128,128) scale=1.0 device time = 6.750 ms (6749.8 us)
+[BENCH] perf_bench shape=(1,8192,64,128,128) scale=1.0 device time = 6.741 ms (6741.3 us)
+→ mean 6741.8 us（vs iter1 采纳锚点 6736.7 = +0.08%，噪声内复现）
+
+=== STEP3: application-level msprof PROF (final) ===
+env -u ASCEND_RT_VISIBLE_DEVICES msprof --output=/tmp/r2_prof_final/prof \
+  --application='python .../perf_tuning/fla_chunk_inter_r2_probe.py' \
+  --task-time=on --aic-mode=task-based --aic-metrics=PipeUtilization
+[INFO] Profiling finished. Data: PROF_000001_20261105183906822_00028753QPEANCCO
+STEP3_EXIT=0
+
+=== STEP4: PROF self-check ===
+op_summary_20261105183928.csv = 13 行（header + 12 launch，非空 ✓）
+main_kernel Task Duration(us): 6811.7(首launch,弃) 6601.9 6679.3 6680.0 6709.3 6646.2
+  6632.3 6694.0 6635.6 6670.4 6678.3 6601.1 → 稳态 11 次 mean 6657.2
+（对照基线轮 prof_baseline 稳态 mean 6775.8 → -1.75%，方向与 do_bench/OPPROF 一致）
+
+=== STEP5: tar ===
+/tmp/r2_prof_final.tar.gz (79531B) → cp 回 perf_tuning/fla_chunk_inter_r2_prof_final.tar.gz
+FINAL_JOB_DONE

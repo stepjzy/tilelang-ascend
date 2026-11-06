@@ -1,0 +1,15 @@
+[SPOT] PASS (B matches A on all 4 outputs)
+[AB] round0 A(iter1)=6710.9us B(iter4_reversed)=6707.3us delta=-0.05%
+[AB] round1 A(iter1)=6723.2us B(iter4_reversed)=6703.2us delta=-0.30%
+[AB] round2 A(iter1)=6698.8us B(iter4_reversed)=6721.9us delta=+0.34%
+[AB-SUMMARY] A_mean=6711.0us B_mean=6710.8us delta_mean=-0.00% rounds_positive=['-0.05%', '-0.30%', '+0.34%']
+
+---
+job: 01a1ab40-9aa3-7545-8269-cf029190bd95
+request_id: prof-fla_chunk_inter-r2-iter4
+env: DevEnvC_DCbyi_npu (1x 910B3, clone@463c234c)
+command: bash -lc 'cd /mnt/workspace/tilelang-ascend && source set_env.sh && cd examples_experiment/dsa_sparse_finetune && python perf_tuning/fla_chunk_inter_r2_ab_iter4.py'
+status: succeeded, exit_code=0, duration=58s (2026-11-05T10:28:21Z ~ 10:29:19Z)
+A module: fla_chunk_inter.py (iter1 adopted, md5 738a0980)
+B module: perf_tuning/fla_chunk_inter_r2_iter4_candidate.py (md5 e604ec0e)
+spot check: bench shape (1,8192,64,128,128), B vs A 4 outputs allclose(rtol=1e-4, atol=1e-3) PASS

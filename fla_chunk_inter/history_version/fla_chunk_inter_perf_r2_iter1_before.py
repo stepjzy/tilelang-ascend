@@ -1,207 +1,175 @@
-"""fla_chunk_inter: KDA chunked backward inter-chunk gradients (dq/dk/dw/dg).
+"""fla_chunk_inter: KDA chunked bwd inter-chunk gradients (dq/dk/dw/dg) on
+Ascend 910B3 (Developer mode, threads=1, single fused CV kernel).
 
-Single fused CV kernel, Developer mode. Stage 3 iteration 2 restructure
-(family-verified fixed-core recipe, fla_chunk_o iter3/final form; evidence
-in perf_tuning/fla_chunk_inter_perf_log.md iterations 0-2):
+Semantics authority (read-only): ref_gpu/fla_chunk_inter.py (Triton/FLA
+chunk_kda_bwd_kernel_inter / wrapper chunk_kda_bwd_dqkwg); code-level origin:
+ref_gpu/fla_chunk_inter_tilelang_gpu.py. Design doc: DESIGN_fla_chunk_inter.md.
 
-* FIXED-CORE grid: T.Kernel(CORE_EFF, threads=1) with ONE in-core
-  T.serial task loop (antipatterns "launch core 数" item A: the previous
-  32768-block launch paid per-block dispatch and, critically, sized every
-  auto-injected V->C relay workspace per cid - a ~4.5 GB footprint that
-  defeated L2, pushing ~9 GB of relay r+w through HBM).
-* EXPLICIT relay workspaces (workspace_idx): 10 f16 operand relays
-  (workspace_1..10, named so AUTO_CV_SYNC handles their cross-core flags;
-  sites are symmetric inside the single loop) + 2 f32 result relays
-  (dq_relay/dk_relay, named to ESCAPE the auto FIFO pairing - their
-  head/tail trip counts are asymmetric by design, see below) shaped
-  (CORE_EFF, NSLOT, ...) - an ~11.8 MB slot ring resident in the 192 MB L2.
-* Single uniform loop, branch-free: iteration j produces task
-  cid + j*CORE_EFF (Select-redirected to cid - an idempotent recompute -
-  when the tid runs past GRID) and then drains task cid + (j-2)*CORE_EFF
-  (redirected to cid when out of range: j<2 reads unwritten slots and
-  writes garbage to the core's own region, overwritten by the real drain
-  at j=2; the last iterations drain the redo results - identical values).
-  Every workspace site lives inside the ONE loop, so AUTO_CV_SYNC pairs
-  them cleanly, and every buffer's FIRST USE is inside the loop, so the
-  memory planner's loop-aware liveness extension does not pin them across
-  the whole loop (the earlier peeled-head variant segfaulted on exactly
-  that - sum of produce+drain UB ~457KB > 196352B).
-* dq/dk result relay uses MANUAL cross-core flags with alternating IDs
-  40 + j%2 and a 2-LATE drain (family final recipe): the drain at
-  iteration j waits the ID that the produce of iteration j-2 raised, so
-  the wait is satisfied two iterations early and the Vector side never
-  stalls on the Cube (msprof on the 1-late variant measured 5.6us/task of
-  Vector flag-wait = the same-iteration lock-step the family documented).
-  The Cube lag bound of <2 keeps the NSLOT=4 ring safe.
-* dgkn is carried across the drain deferral inside a [NSLOT, bDK] UB ring
-  (dgkn_ring), not a single buffer (produce(j) would clobber the drained
-  task's accumulator otherwise; ring depth 4 > drain deferral 2).
-* Produce-before-drain within each iteration (drain-first deadlocks: the
-  drain waits for a flag the same iteration's produce has not set yet).
-* The DV axis is a single straight-line pass (iteration 1): one full-width
-  [*, DV] load per operand, ONE relay per hi/lo operand, ONE full-K gemm
-  per hi/lo pair (9 gemms, init=True group heads), single-shot dgkn reduce.
+Math (per chunk, per head; BT=64, last(c) = chunk-local row 63 in-domain):
+    dq_raw = do @ h^T          [BT, DK]      dk_raw = v @ dh^T
+    dw     = -(dv @ h^T)                      (sign folded into the dv load)
+    dgk    = (h * dh).sum(DV) * 2^gn          [DK]
+    dq     = dq_raw * scale * 2^g ;  dk = dk_raw * 2^(gn - g)
+    dg     = q*dq - k*dk + last_row * (dgk + sum_t dk*k)
 
-Per task, one (B, chunk, head, dk-block) tile computes:
+Structure (DESIGN sec 3.3 / 8, inter-sibling verified recipe):
+  * fixed-core(20) single T.serial(L) task loop; task = (b, chunk, head)
+    (NK-merge: the DK blocks iterate INSIDE the task, so v/do/dv load once).
+    Past-GRID iterations Select-redirect to cid's own task and re-compute it
+    idempotently (GM writes + relay overwrites are idempotent, L0C frags are
+    init=True group heads), which keeps every on-chip buffer's liveness a
+    single contiguous interval.
+  * per iteration: produce (V: loads + hi/lo splits + operand relays) ->
+    C (12 gemm_v0 = 4 groups x hi/lo triple; dw stores GM directly; dq/dk/dgm
+    go to the fused ddr relay) -> drain (V, 1-late: fused relay readback +
+    gating chains + halving-tree reduce + last-row injection + GM writes).
+  * relays: 10 fp16 operand workspaces (V->C; AUTO_CV_SYNC pairs them by
+    buffer name, same-iteration) + ONE fused fp32 ddr_relay (C->V; MANUAL
+    1-late FIX flag on the dedicated slot 10 -- its name lacks the
+    "workspace" prefix so it escapes the auto FIFO pairing, and slot 10 is
+    the only id whose 0xf mask escapes the auto allocator's 0..9 range; a
+    prologue head-set keeps the flag counts balanced and drain(0) primed).
 
-    dq = (do @ h^T) * scale * 2^g
-    dk = (v @ dh^T) * 2^(gn - g)
-    dw = -(dv @ h^T)                       (sign folded into the dv operand)
-    dg = q*dq - k*dk + m_last * pp,         pp = 2^gn * sum_v(h*dh) + sum_t(dk*k)
-
-Toolchain-mandated implementation notes (family-verified, see DESIGN section 3):
-- fp32 gemm_v0 is broken on this toolchain, so every GEMM operand is split
-  into fp16 hi/lo pairs (x = hi + lo) and each GEMM becomes hi@hi + hi@lo +
-  lo@hi with fp32 L0C accumulation (relative error ~2^-22 per operand pair).
-- exp2 has no Ascend backend: 2^x is computed as exp(x * ln2).
-- A UB source may only be relayed to a single L1 destination (the workspace
-  pass resolves V->C relay writes by source buffer name), so the dw group
-  shares the dq group's h relay (same transpose_B right-operand role).
-- Supported domain (asserted by _check_shape): S % 64 == 0, DK % 32 == 0,
-  DV multiple of 16 and >= 64, chunk_size == 64, all fp32.
+Ascend toolchain adaptations (DESIGN sec 3.5.1, all verified in this repo):
+  * scratch-free red line: ZERO T.reduce_sum / T.tile.broadcast. The column
+    reduce is a literal 6-level halving tree; the row-vector broadcast gate
+    is transpose + row_expand_sub_experiment (bDK=64) or a T.unroll row-Sub
+    chain (bDK=32); the last-row injection is a single-row add; diag(h@dh^T)
+    is a C-side gemm group + gather diagonal extraction.
+  * fp32 gemm_v0 operands are broken on this toolchain -> fp16 hi/lo 3-gemm
+    per logical GEMM (x = hi + lo, hi = f16(x), lo = f16(x - f32(hi))).
+  * exp2 has no Ascend backend -> exp(x * LN2) with the ln2 pre-fold on g/gn.
+  * block_DK adaptive: 64 when DK%64==0 and DV>=128 (256B row window), else
+    32 (row-chain gate) -- a pure metadata performance parameter, both paths
+    cover the whole declared domain.
+  * out_idx / workspace_idx are absolute indices (never negative).
 """
 
-import torch
 import tilelang
+import torch
 from tilelang import language as T
 
-LN2 = 0.6931471805599453  # 2^x = exp(x * ln2)
-
-CORE_NUM = 20  # Ascend 910B3 AI Cube cores (fixed-core grid ceiling)
-NSLOT = 4  # relay slot ring depth (>=2: cube lag bound 1 + margin)
+# 2^x is computed as exp(x * ln2): exp2 has no Ascend backend mapping.
+LN2 = 0.6931471805599453
+# fixed-core grid ceiling (910B3 AI Cube cores) and relay slot-ring depth
+# (cube lag upper bound 1 + margin).
+CORE_NUM = 20
+NSLOT = 4
 
 PASS_CONFIGS = {
-    tilelang.PassConfigKey.TL_ASCEND_AUTO_CV_COMBINE: True,  # auto C/V split
-    tilelang.PassConfigKey.TL_ASCEND_AUTO_CV_SYNC: True,  # cross-core flags on workspace_* relays
-    tilelang.PassConfigKey.TL_ASCEND_AUTO_SYNC: True,  # auto intra-core sync
-    tilelang.PassConfigKey.TL_ASCEND_MEMORY_PLANNING: True,  # UB/L1 lifetime planning
+    tilelang.PassConfigKey.TL_ASCEND_AUTO_CV_COMBINE: True,
+    tilelang.PassConfigKey.TL_ASCEND_AUTO_CV_SYNC: True,
+    tilelang.PassConfigKey.TL_ASCEND_AUTO_SYNC: True,
+    tilelang.PassConfigKey.TL_ASCEND_MEMORY_PLANNING: True,
 }
 
-_LAST_ROW_CACHE: dict = {}
 
+def _check_shape(B, S, H, DK, DV, chunk_size, block_DK=None):
+    """Domain gate (DESIGN sec 1.6): deterministic rejection replaces the
+    reference implementation's undefined OOB behavior for S % 64 != 0.
 
-def get_last_row():
-    """m_last row indicator constant [64] fp32 (row 63 = 1.0).
-
-    In-domain last(c) is always chunk-local row 63 (S % 64 == 0), so the
-    (t == last(c)) row selection is a fixed constant: built once on CPU,
-    single H2D, cached per device.
+    Returns the adaptive block_DK (a performance parameter, not a dispatch
+    gate: both the 64 and 32 paths cover the whole declared domain).
     """
-    dev = "npu"
-    if dev not in _LAST_ROW_CACHE:
-        last = torch.zeros(64, dtype=torch.float32)
-        last[63] = 1.0
-        _LAST_ROW_CACHE[dev] = last.to(dev)
-    return _LAST_ROW_CACHE[dev]
+    if chunk_size != 64:
+        raise ValueError(f"chunk_size={chunk_size} unsupported: only 64 (fixed chunked data model)")
+    if S % chunk_size != 0:
+        raise ValueError(
+            f"S={S} not divisible by chunk_size={chunk_size}: mathematically undefined domain (a trailing partial chunk has no h/dh state)"
+        )
+    if DK % 32 != 0:
+        raise ValueError(f"DK={DK} must be a multiple of 32 (block_DK exact split)")
+    if DV % 16 != 0 or DV < 64:
+        raise ValueError(f"DV={DV} must be a multiple of 16 and >= 64 (gemm K fractals + 32B alignment)")
+    if B < 1 or H < 1:
+        raise ValueError(f"B={B}, H={H} must be >= 1")
+    if block_DK is None:
+        block_DK = 64 if (DK % 64 == 0 and DV >= 128) else 32
+    if block_DK not in (32, 64):
+        raise ValueError(f"block_DK={block_DK} must be 32 or 64")
+    if DK % block_DK != 0:
+        raise ValueError(f"DK={DK} not divisible by block_DK={block_DK}")
+    return block_DK
 
 
-def _check_shape(B, S, H, DK, DV, chunk_size=64):
-    """Assert the supported domain (DESIGN section 1.6, deterministic reject).
-
-    S % 64 != 0 is undefined in the reference implementations (h/dh have no
-    state for the trailing partial chunk; Triton i_tg reads out of bounds,
-    upstream TileLang silently OOBs) - rejected here deterministically.
-    """
-    assert chunk_size == 64, f"fla_chunk_inter: chunk_size must be 64, got {chunk_size}"
-    assert S % chunk_size == 0, (
-        f"fla_chunk_inter: S % 64 == 0 required (chunked data model; S%64!=0 is undefined in the reference implementations), got S={S}"
-    )
-    assert DK % 32 == 0, f"fla_chunk_inter: DK % 32 == 0 required (block_DK=32), got DK={DK}"
-    assert DV % 16 == 0 and DV >= 64, (
-        f"fla_chunk_inter: DV must be a multiple of 16 and >= 64 (gemm K=DV needs K>=32 fractal and 32B alignment), got DV={DV}"
-    )
-    assert B >= 1 and H >= 1, f"fla_chunk_inter: B/H must be >= 1, got B={B}, H={H}"
-
-
+# ============================================================================
+# single fused kernel: out_idx=[19..22] (dq/dk/dw/dg), workspace_idx=[8..18]
+# (10 operand relays + the fused ddr relay; absolute indices, never negative).
+# ============================================================================
 @tilelang.jit(
-    out_idx=[21, 22, 23, 24],
-    workspace_idx=[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+    out_idx=[19, 20, 21, 22],
+    workspace_idx=[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
     pass_configs=PASS_CONFIGS,
 )
-def fla_chunk_inter(B, S, H, DK, DV, scale=1.0, chunk_size=64, block_DK=32):
-    """KDA chunked bwd inter-chunk gradients, single fixed-core kernel.
-
-    out_idx/workspace_idx use ABSOLUTE indices over the declared 25-tensor
-    signature (negative indices misalign - family pitfall). Signature order:
-    0-8 inputs (8 operands + LastRow), 9-20 relay workspaces, 21-24 outputs.
-    """
+def fla_chunk_inter(B, S, H, DK, DV, scale=1.0, chunk_size=64, block_DK=None):
+    block_DK = _check_shape(B, S, H, DK, DV, chunk_size, block_DK)
     BS = chunk_size
     NT = S // BS
     NK = DK // block_DK
-    GRID = NK * NT * B * H
-    # Fixed-core striped decomposition: CORE_EFF blocks (clamped to the task
-    # count so the Select redirect target cid is always in-range), each
-    # running a single T.serial loop of L iterations. Real striped tasks of
-    # core cid are cid + t*CORE_EFF for t < T_valid (BASE or BASE+1); the +2
-    # loop slack covers the 1-late drain and the redirect-redo iterations.
+    GRID = NT * B * H
+    # fixed-core striped decomposition: core cid handles tasks cid + t*CORE_EFF
     CORE_EFF = min(CORE_NUM, GRID)
-    BASE = GRID // CORE_EFF
-    REM = GRID - BASE * CORE_EFF
-    L = BASE + 2  # produce t + drain t-1 for t in [0, BASE], +1 drain-only tail
-
-    K_shape = (B, S, H, DK)
-    V_shape = (B, S, H, DV)
-    H_shape = (B, NT, H, DK, DV)
-    WS_L = (CORE_EFF, NSLOT, BS, DV)  # f16 left-operand relays [BS, DV]
-    WS_R = (CORE_EFF, NSLOT, block_DK, DV)  # f16 right-operand relays [bDK, DV]
-    WS_O = (CORE_EFF, NSLOT, BS, block_DK)  # f32 result relays [BS, bDK]
+    L = GRID // CORE_EFF + 2  # +2 slack: 1-late drain tail + redirect redo
+    WS_L = (CORE_EFF, NSLOT, BS, DV)  # fp16 left-operand relay (one slot/task)
+    WS_R = (CORE_EFF, NSLOT * NK, block_DK, DV)  # fp16 right relay (flat task,bk)
+    WS_F = (CORE_EFF, NSLOT * NK, 2 * BS + block_DK, block_DK)  # fused drain relay
 
     @T.prim_func
     def main(
-        Q: T.Tensor(K_shape, "float32"),  # type: ignore
-        K: T.Tensor(K_shape, "float32"),  # type: ignore
-        V: T.Tensor(V_shape, "float32"),  # type: ignore
-        G: T.Tensor(K_shape, "float32"),  # type: ignore
-        h: T.Tensor(H_shape, "float32"),  # type: ignore
-        dv: T.Tensor(V_shape, "float32"),  # type: ignore
-        DO: T.Tensor(V_shape, "float32"),  # type: ignore
-        Dh: T.Tensor(H_shape, "float32"),  # type: ignore
-        LastRow: T.Tensor((BS,), "float32"),  # type: ignore
-        workspace_1: T.Tensor(WS_L, "float16"),  # type: ignore  # do_hi
-        workspace_2: T.Tensor(WS_L, "float16"),  # type: ignore  # do_lo
-        workspace_3: T.Tensor(WS_R, "float16"),  # type: ignore  # h_hi
-        workspace_4: T.Tensor(WS_R, "float16"),  # type: ignore  # h_lo
-        workspace_5: T.Tensor(WS_L, "float16"),  # type: ignore  # v_hi
-        workspace_6: T.Tensor(WS_L, "float16"),  # type: ignore  # v_lo
-        workspace_7: T.Tensor(WS_R, "float16"),  # type: ignore  # dh_hi
-        workspace_8: T.Tensor(WS_R, "float16"),  # type: ignore  # dh_lo
-        workspace_9: T.Tensor(WS_L, "float16"),  # type: ignore  # dvn_hi
-        workspace_10: T.Tensor(WS_L, "float16"),  # type: ignore  # dvn_lo
-        dq_relay: T.Tensor(WS_O, "float32"),  # type: ignore  # dq results (manual flag)
-        dk_relay: T.Tensor(WS_O, "float32"),  # type: ignore  # dk results (manual flag)
-        dq: T.Tensor(K_shape, "float32"),  # type: ignore
-        dk: T.Tensor(K_shape, "float32"),  # type: ignore
-        dw: T.Tensor(K_shape, "float32"),  # type: ignore
-        dg: T.Tensor(K_shape, "float32"),  # type: ignore
+        Q: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        K: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        V: T.Tensor((B, S, H, DV), "float32"),  # type: ignore
+        G: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        h: T.Tensor((B, NT, H, DK, DV), "float32"),  # type: ignore
+        dv: T.Tensor((B, S, H, DV), "float32"),  # type: ignore
+        DO: T.Tensor((B, S, H, DV), "float32"),  # type: ignore
+        Dh: T.Tensor((B, NT, H, DK, DV), "float32"),  # type: ignore
+        workspace_1: T.Tensor(WS_L, "float16"),  # type: ignore  # do hi
+        workspace_2: T.Tensor(WS_L, "float16"),  # type: ignore  # do lo
+        workspace_3: T.Tensor(WS_R, "float16"),  # type: ignore  # h hi (dq+dw share)
+        workspace_4: T.Tensor(WS_R, "float16"),  # type: ignore  # h lo (dq+dw share)
+        workspace_5: T.Tensor(WS_L, "float16"),  # type: ignore  # v hi
+        workspace_6: T.Tensor(WS_L, "float16"),  # type: ignore  # v lo
+        workspace_7: T.Tensor(WS_R, "float16"),  # type: ignore  # dh hi
+        workspace_8: T.Tensor(WS_R, "float16"),  # type: ignore  # dh lo
+        workspace_9: T.Tensor(WS_L, "float16"),  # type: ignore  # (-dv) hi
+        workspace_10: T.Tensor(WS_L, "float16"),  # type: ignore  # (-dv) lo
+        ddr_relay: T.Tensor(WS_F, "float32"),  # type: ignore
+        dq: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        dk: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        dw: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
+        dg: T.Tensor((B, S, H, DK), "float32"),  # type: ignore
     ):
         with T.Kernel(CORE_EFF, threads=1, is_npu=True) as (cid):
-            # ---- L0C accumulators (fp32; per-task, reused every iteration) ----
+            # ---- L0C frags (fp32 accumulators, reused every iteration) ----
             dq_frag = T.alloc_fragment((BS, block_DK), "float32")
             dk_frag = T.alloc_fragment((BS, block_DK), "float32")
             dw_frag = T.alloc_fragment((BS, block_DK), "float32")
-            # ---- UB: produce-side fp32 load domain (full-DV single pass) ----
+            dgm_frag = T.alloc_fragment((block_DK, block_DK), "float32")
+            # ---- produce side: fp32 load domain ----
             h_ub = T.alloc_shared((block_DK, DV), "float32")
-            dh_ub = T.alloc_shared((block_DK, DV), "float32")  # reused as h*dh
+            dh_ub = T.alloc_shared((block_DK, DV), "float32")
             v_ub = T.alloc_shared((BS, DV), "float32")
             do_ub = T.alloc_shared((BS, DV), "float32")
             dvn_ub = T.alloc_shared((BS, DV), "float32")
-            # ---- UB: fp32 split temps (shared across operands) ----
+            # shared split temps (left / right operands)
             t_hi = T.alloc_shared((BS, DV), "float32")
             t_lo = T.alloc_shared((BS, DV), "float32")
             th_hi = T.alloc_shared((block_DK, DV), "float32")
             th_lo = T.alloc_shared((block_DK, DV), "float32")
-            # ---- UB: fp16 hi/lo staging (dead once relayed) ----
-            do_hi = T.alloc_shared((BS, DV), "float16")
-            do_lo = T.alloc_shared((BS, DV), "float16")
-            v_hi = T.alloc_shared((BS, DV), "float16")
-            v_lo = T.alloc_shared((BS, DV), "float16")
-            dvn_hi = T.alloc_shared((BS, DV), "float16")
-            dvn_lo = T.alloc_shared((BS, DV), "float16")
-            h_hi = T.alloc_shared((block_DK, DV), "float16")
-            h_lo = T.alloc_shared((block_DK, DV), "float16")
-            dh_hi = T.alloc_shared((block_DK, DV), "float16")
-            dh_lo = T.alloc_shared((block_DK, DV), "float16")
-            # ---- L1: gemm operands (fp16; per-task, reused) ----
+            # fp16 hi/lo staging = dedicated relay sources (one per workspace;
+            # dead once relayed -- the workspace pass keys relays by name)
+            do_hi_ub = T.alloc_shared((BS, DV), "float16")
+            do_lo_ub = T.alloc_shared((BS, DV), "float16")
+            v_hi_ub = T.alloc_shared((BS, DV), "float16")
+            v_lo_ub = T.alloc_shared((BS, DV), "float16")
+            dvn_hi_ub = T.alloc_shared((BS, DV), "float16")
+            dvn_lo_ub = T.alloc_shared((BS, DV), "float16")
+            h_hi_ub = T.alloc_shared((block_DK, DV), "float16")
+            h_lo_ub = T.alloc_shared((block_DK, DV), "float16")
+            dh_hi_ub = T.alloc_shared((block_DK, DV), "float16")
+            dh_lo_ub = T.alloc_shared((block_DK, DV), "float16")
+            # ---- L1 gemm operands (fp16; left reused across bk) ----
             do_hi_l1 = T.alloc_shared((BS, DV), "float16")
             do_lo_l1 = T.alloc_shared((BS, DV), "float16")
             v_hi_l1 = T.alloc_shared((BS, DV), "float16")
@@ -212,196 +180,259 @@ def fla_chunk_inter(B, S, H, DK, DV, scale=1.0, chunk_size=64, block_DK=32):
             h_lo_l1 = T.alloc_shared((block_DK, DV), "float16")
             dh_hi_l1 = T.alloc_shared((block_DK, DV), "float16")
             dh_lo_l1 = T.alloc_shared((block_DK, DV), "float16")
-            # ---- UB: dgkn ring (produced in task j, drained in task j+1) ----
-            dgkn_ring = T.alloc_shared((NSLOT, block_DK), "float32")
-            # ---- UB: drain-side (epilogue) buffers ----
-            g_ub = T.alloc_shared((BS, block_DK), "float32")
-            gexp_ub = T.alloc_shared((BS, block_DK), "float32")
+            # ---- drain side ----
+            ddr_ub = T.alloc_shared((2 * BS + block_DK, block_DK), "float32")
+            dgkn_ub = T.alloc_shared((block_DK,), "float32")
             gn_ub = T.alloc_shared((block_DK,), "float32")
             gnexp_ub = T.alloc_shared((block_DK,), "float32")
-            gn2d_ub = T.alloc_shared((BS, block_DK), "float32")
+            dgk_off_i32 = T.alloc_shared((block_DK,), "int32")
+            dgk_off_u32 = T.alloc_shared((block_DK,), "uint32")
+            g_ub = T.alloc_shared((BS, block_DK), "float32")
+            gexp_ub = T.alloc_shared((BS, block_DK), "float32")
             gnd_ub = T.alloc_shared((BS, block_DK), "float32")
             q_ub = T.alloc_shared((BS, block_DK), "float32")
             k_ub = T.alloc_shared((BS, block_DK), "float32")
-            dq_ub = T.alloc_shared((BS, block_DK), "float32")
-            dk_ub = T.alloc_shared((BS, block_DK), "float32")
             dkk_ub = T.alloc_shared((BS, block_DK), "float32")
             dg_ub = T.alloc_shared((BS, block_DK), "float32")
-            pp_ub = T.alloc_shared((block_DK,), "float32")
-            pp2d_ub = T.alloc_shared((BS, block_DK), "float32")
-            ml_ub = T.alloc_shared((BS,), "float32")
-            ml2d_ub = T.alloc_shared((BS, block_DK), "float32")
-            mp2d_ub = T.alloc_shared((BS, block_DK), "float32")
+            gexp_tmp = T.alloc_shared((block_DK, 8), "float32")
 
-            # ---- loop-invariant hoist: LastRow constant once per core ----
-            T.copy(LastRow[0:BS], ml_ub)
+            # ---- prologue: gather byte offsets (live code) + head-set that
+            # primes drain(0)'s 1-late wait (flag counts stay balanced) ----
+            T.tile.arith_progression(dgk_off_i32, 0, (block_DK + 1) * 4, block_DK)
+            T.reinterpretcast(dgk_off_u32, dgk_off_i32, "uint32_t")
+            # MANUAL FLAG SLOT: 10 (a literal id whose GetffstMsg 0xf mask is
+            # itself). The 10 operand relays make AUTO_CV_SYNC allocate auto
+            # flag ids 0..9, so the previous-round scheme 40/41 (masks 8/9)
+            # double-booked the ws_8/ws_9 slots -- the AIV's own produce
+            # auto-sets could satisfy the drain's 1-late wait before the AIC's
+            # ddr writes landed (timing-luck correctness). Slot 10 is the only
+            # uncollided user slot (11..14 system-reserved); a single
+            # dedicated slot keeps the 1-late protocol sound: every wait is
+            # guaranteed the previous iteration's set fired (pending <= 2).
+            T.set_cross_flag("FIX", 10)
 
-            # ============ single uniform produce+drain loop ============
+            # ============ single task loop: produce(j) + drain(j-1) ============
             for j in T.serial(L):
                 tid_p = cid + j * CORE_EFF
-                pt = T.if_then_else(tid_p < GRID, tid_p, cid)  # redo cid when past GRID
-                tid_d = cid + (j - 1) * CORE_EFF
-                dt = T.if_then_else(
-                    tid_d < GRID, T.if_then_else(tid_d >= 0, tid_d, cid), cid
-                )
+                pt = T.if_then_else(tid_p < GRID, tid_p, cid)  # redirect redo
                 slot = j % NSLOT
-                dslot = (j + NSLOT - 1) % NSLOT
-
-                # ================= produce task pt (slot) =================
-                bk = pt % NK
-                bsh = pt // NK
-                bs = bsh % NT
-                bbh = bsh // NT
-                bb = bbh // H
-                bh = bbh % H
+                # ---- produce task pt ----
+                bh = pt % H
+                bt = pt // H
+                bs = bt % NT
+                bb = bt // NT
                 s0 = bs * BS
-                dk0 = bk * block_DK
-                # -- V: h/dh loads (issued together; MTE2 pipelines them) --
-                T.copy(h[bb, bs, bh, dk0 : dk0 + block_DK, 0:DV], h_ub)
-                T.copy(Dh[bb, bs, bh, dk0 : dk0 + block_DK, 0:DV], dh_ub)
-                # -- V: dh split -> relay --
-                T.copy(dh_ub, dh_hi)
-                T.copy(dh_hi, th_hi)
-                T.tile.sub(th_lo, dh_ub, th_hi)
-                T.copy(th_lo, dh_lo)
-                T.copy(dh_hi, workspace_7[cid, slot, 0:block_DK, 0:DV])
-                T.copy(dh_lo, workspace_8[cid, slot, 0:block_DK, 0:DV])
-                # -- V: h split -> relay (shared by the dq and dw gemm groups) --
-                T.copy(h_ub, h_hi)
-                T.copy(h_hi, th_hi)
-                T.tile.sub(th_lo, h_ub, th_hi)
-                T.copy(th_lo, h_lo)
-                T.copy(h_hi, workspace_3[cid, slot, 0:block_DK, 0:DV])
-                T.copy(h_lo, workspace_4[cid, slot, 0:block_DK, 0:DV])
-                # -- V: dgkn = sum_v h*dh (dh_ub reused in place; ring slot) --
-                T.tile.mul(dh_ub, dh_ub, h_ub)
-                T.reduce_sum(dh_ub, dgkn_ring[slot, 0:block_DK], dim=1, clear=True)
-                # -- V: do load+split -> relay (dq group left operand) --
+                # right operands per bk: load -> hi/lo split -> flat (task,bk) relay
+                for bk in range(NK):
+                    dk0 = bk * block_DK
+                    T.copy(h[bb, bs, bh, dk0 : dk0 + block_DK, 0:DV], h_ub)
+                    T.copy(Dh[bb, bs, bh, dk0 : dk0 + block_DK, 0:DV], dh_ub)
+                    # dh split (cast -> sub -> cast, all UB<->UB)
+                    T.copy(dh_ub, dh_hi_ub)
+                    T.copy(dh_hi_ub, th_hi)
+                    T.tile.sub(th_lo, dh_ub, th_hi)
+                    T.copy(th_lo, dh_lo_ub)
+                    T.copy(dh_hi_ub, workspace_7[cid, slot * NK + bk, 0:block_DK, 0:DV])
+                    T.copy(dh_lo_ub, workspace_8[cid, slot * NK + bk, 0:block_DK, 0:DV])
+                    # h split (the dq AND dw groups share this relay: one UB
+                    # source -> single L1 destination)
+                    T.copy(h_ub, h_hi_ub)
+                    T.copy(h_hi_ub, th_hi)
+                    T.tile.sub(th_lo, h_ub, th_hi)
+                    T.copy(th_lo, h_lo_ub)
+                    T.copy(h_hi_ub, workspace_3[cid, slot * NK + bk, 0:block_DK, 0:DV])
+                    T.copy(h_lo_ub, workspace_4[cid, slot * NK + bk, 0:block_DK, 0:DV])
+                # left operands once per task (NK-merge: no DK axis)
                 T.copy(DO[bb, s0 : s0 + BS, bh, 0:DV], do_ub)
-                T.copy(do_ub, do_hi)
-                T.copy(do_hi, t_hi)
+                T.copy(do_ub, do_hi_ub)
+                T.copy(do_hi_ub, t_hi)
                 T.tile.sub(t_lo, do_ub, t_hi)
-                T.copy(t_lo, do_lo)
-                T.copy(do_hi, workspace_1[cid, slot, 0:BS, 0:DV])
-                T.copy(do_lo, workspace_2[cid, slot, 0:BS, 0:DV])
-                # -- V: v load+split -> relay (dk group left operand) --
+                T.copy(t_lo, do_lo_ub)
+                T.copy(do_hi_ub, workspace_1[cid, slot, 0:BS, 0:DV])
+                T.copy(do_lo_ub, workspace_2[cid, slot, 0:BS, 0:DV])
                 T.copy(V[bb, s0 : s0 + BS, bh, 0:DV], v_ub)
-                T.copy(v_ub, v_hi)
-                T.copy(v_hi, t_hi)
+                T.copy(v_ub, v_hi_ub)
+                T.copy(v_hi_ub, t_hi)
                 T.tile.sub(t_lo, v_ub, t_hi)
-                T.copy(t_lo, v_lo)
-                T.copy(v_hi, workspace_5[cid, slot, 0:BS, 0:DV])
-                T.copy(v_lo, workspace_6[cid, slot, 0:BS, 0:DV])
-                # -- V: dv load -> negate (dw sign folding) -> split -> relay --
+                T.copy(t_lo, v_lo_ub)
+                T.copy(v_hi_ub, workspace_5[cid, slot, 0:BS, 0:DV])
+                T.copy(v_lo_ub, workspace_6[cid, slot, 0:BS, 0:DV])
                 T.copy(dv[bb, s0 : s0 + BS, bh, 0:DV], dvn_ub)
-                T.tile.mul(dvn_ub, dvn_ub, -1.0)
-                T.copy(dvn_ub, dvn_hi)
-                T.copy(dvn_hi, t_hi)
+                T.tile.mul(dvn_ub, dvn_ub, -1.0)  # dw sign fold
+                T.copy(dvn_ub, dvn_hi_ub)
+                T.copy(dvn_hi_ub, t_hi)
                 T.tile.sub(t_lo, dvn_ub, t_hi)
-                T.copy(t_lo, dvn_lo)
-                T.copy(dvn_hi, workspace_9[cid, slot, 0:BS, 0:DV])
-                T.copy(dvn_lo, workspace_10[cid, slot, 0:BS, 0:DV])
-                # -- C: consume relays (each read issued just before its
-                # first use so MTE2 latency overlaps the gemms) --
+                T.copy(t_lo, dvn_lo_ub)
+                T.copy(dvn_hi_ub, workspace_9[cid, slot, 0:BS, 0:DV])
+                T.copy(dvn_lo_ub, workspace_10[cid, slot, 0:BS, 0:DV])
+                # ---- C: left relays -> L1 (once per task, A reused across bk) ----
                 T.copy(workspace_1[cid, slot, 0:BS, 0:DV], do_hi_l1)
-                T.copy(workspace_3[cid, slot, 0:block_DK, 0:DV], h_hi_l1)
-                T.gemm_v0(do_hi_l1, h_hi_l1, dq_frag, transpose_B=True, init=True)
-                T.copy(workspace_4[cid, slot, 0:block_DK, 0:DV], h_lo_l1)
-                T.gemm_v0(do_hi_l1, h_lo_l1, dq_frag, transpose_B=True, init=False)
                 T.copy(workspace_2[cid, slot, 0:BS, 0:DV], do_lo_l1)
-                T.gemm_v0(do_lo_l1, h_hi_l1, dq_frag, transpose_B=True, init=False)
                 T.copy(workspace_5[cid, slot, 0:BS, 0:DV], v_hi_l1)
-                T.copy(workspace_7[cid, slot, 0:block_DK, 0:DV], dh_hi_l1)
-                T.gemm_v0(v_hi_l1, dh_hi_l1, dk_frag, transpose_B=True, init=True)
-                T.copy(workspace_8[cid, slot, 0:block_DK, 0:DV], dh_lo_l1)
-                T.gemm_v0(v_hi_l1, dh_lo_l1, dk_frag, transpose_B=True, init=False)
                 T.copy(workspace_6[cid, slot, 0:BS, 0:DV], v_lo_l1)
-                T.gemm_v0(v_lo_l1, dh_hi_l1, dk_frag, transpose_B=True, init=False)
                 T.copy(workspace_9[cid, slot, 0:BS, 0:DV], dvn_hi_l1)
-                T.gemm_v0(dvn_hi_l1, h_hi_l1, dw_frag, transpose_B=True, init=True)
-                T.gemm_v0(dvn_hi_l1, h_lo_l1, dw_frag, transpose_B=True, init=False)
                 T.copy(workspace_10[cid, slot, 0:BS, 0:DV], dvn_lo_l1)
-                T.gemm_v0(dvn_lo_l1, h_hi_l1, dw_frag, transpose_B=True, init=False)
-                # -- C: dw direct GM store (fp32->fp32, sign pre-folded) --
-                T.copy(dw_frag, dw[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
-                # -- C: dq/dk frag -> result relays; MANUAL flag (alternating
-                # ID; a single auto FIFO ID would lock-step the two cores) --
-                T.copy(dq_frag, dq_relay[cid, slot, 0:BS, 0:block_DK])
-                T.copy(dk_frag, dk_relay[cid, slot, 0:BS, 0:block_DK])
-                T.set_cross_flag("FIX", 40 + j % 2)
+                # ---- C: per bk right relays + 12 gemms + stores ----
+                for bk in range(NK):
+                    dk0 = bk * block_DK
+                    # dq group: do @ h^T
+                    T.copy(workspace_3[cid, slot * NK + bk, 0:block_DK, 0:DV], h_hi_l1)
+                    T.gemm_v0(do_hi_l1, h_hi_l1, dq_frag, transpose_B=True, init=True)
+                    T.copy(workspace_4[cid, slot * NK + bk, 0:block_DK, 0:DV], h_lo_l1)
+                    T.gemm_v0(do_hi_l1, h_lo_l1, dq_frag, transpose_B=True, init=False)
+                    T.gemm_v0(do_lo_l1, h_hi_l1, dq_frag, transpose_B=True, init=False)
+                    # dk group: v @ dh^T
+                    T.copy(workspace_7[cid, slot * NK + bk, 0:block_DK, 0:DV], dh_hi_l1)
+                    T.gemm_v0(v_hi_l1, dh_hi_l1, dk_frag, transpose_B=True, init=True)
+                    T.copy(workspace_8[cid, slot * NK + bk, 0:block_DK, 0:DV], dh_lo_l1)
+                    T.gemm_v0(v_hi_l1, dh_lo_l1, dk_frag, transpose_B=True, init=False)
+                    T.gemm_v0(v_lo_l1, dh_hi_l1, dk_frag, transpose_B=True, init=False)
+                    # dw group: -(dv @ h^T) with the sign folded into dvn
+                    T.gemm_v0(dvn_hi_l1, h_hi_l1, dw_frag, transpose_B=True, init=True)
+                    T.gemm_v0(dvn_hi_l1, h_lo_l1, dw_frag, transpose_B=True, init=False)
+                    T.gemm_v0(dvn_lo_l1, h_hi_l1, dw_frag, transpose_B=True, init=False)
+                    # dgkn diagonal group: dgm = h @ dh^T (reuses the L1 operands)
+                    T.gemm_v0(h_hi_l1, dh_hi_l1, dgm_frag, transpose_B=True, init=True)
+                    T.gemm_v0(h_hi_l1, dh_lo_l1, dgm_frag, transpose_B=True, init=False)
+                    T.gemm_v0(h_lo_l1, dh_hi_l1, dgm_frag, transpose_B=True, init=False)
+                    # dw direct store (same dtype L0C->GM, sign already folded)
+                    T.copy(dw_frag, dw[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
+                    # fused drain relay rows: [0,BS)=dq | [BS,2BS)=dk | dgm tail
+                    T.copy(dq_frag, ddr_relay[cid, slot * NK + bk, 0:BS, 0:block_DK])
+                    T.copy(dk_frag, ddr_relay[cid, slot * NK + bk, BS : 2 * BS, 0:block_DK])
+                    T.copy(
+                        dgm_frag,
+                        ddr_relay[cid, slot * NK + bk, 2 * BS : 2 * BS + block_DK, 0:block_DK],
+                    )
+                # 1-late drain handoff on the dedicated uncollided slot 10
+                T.set_cross_flag("FIX", 10)
 
-                # ============ drain task dt (slot dslot) ============
-                bk = dt % NK
-                bsh = dt // NK
-                bs = bsh % NT
-                bbh = bsh // NT
-                bb = bbh // H
-                bh = bbh % H
+                # ---- drain task j-1 (reads dslot; garbage at j=0, overwritten
+                # idempotently by the redirect-redo structure) ----
+                tid_d = cid + (j - 1) * CORE_EFF
+                dt = T.if_then_else(tid_d < GRID, T.if_then_else(tid_d >= 0, tid_d, cid), cid)
+                dslot = (j + NSLOT - 1) % NSLOT
+                bh = dt % H
+                bt = dt // H
+                bs = bt % NT
+                bb = bt // NT
                 s0 = bs * BS
-                dk0 = bk * block_DK
-                T.wait_cross_flag(40 + j % 2, "V")
-                T.copy(dq_relay[cid, dslot, 0:BS, 0:block_DK], dq_ub)
-                T.copy(dk_relay[cid, dslot, 0:BS, 0:block_DK], dk_ub)
-                T.copy(G[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], g_ub)
-                T.copy(G[bb, s0 + BS - 1, bh, dk0 : dk0 + block_DK], gn_ub)
-                T.copy(Q[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], q_ub)
-                T.copy(K[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], k_ub)
-                # dq = dq_raw * scale * 2^g
-                T.tile.mul(gexp_ub, g_ub, LN2)
-                T.tile.exp(gexp_ub, gexp_ub)
-                T.tile.mul(dq_ub, dq_ub, gexp_ub)
-                if scale != 1.0:  # trace-time fold: skip the identity multiply
-                    T.tile.mul(dq_ub, dq_ub, scale)
-                # dgkn *= 2^gn; dk *= 2^(gn - g)
-                T.tile.mul(gnexp_ub, gn_ub, LN2)
-                T.tile.exp(gnexp_ub, gnexp_ub)
-                T.tile.mul(dgkn_ring[dslot, 0:block_DK], dgkn_ring[dslot, 0:block_DK], gnexp_ub)
-                T.tile.broadcast(gn2d_ub, gn_ub, axis=0)
-                T.tile.sub(gnd_ub, gn2d_ub, g_ub)
-                T.tile.mul(gnd_ub, gnd_ub, LN2)
-                T.tile.exp(gnd_ub, gnd_ub)
-                T.tile.mul(dk_ub, dk_ub, gnd_ub)
-                # pp = dgkn + sum_t dk*k (dkk doubles as dg's -k*dk term)
-                T.tile.mul(dkk_ub, dk_ub, k_ub)
-                T.reduce_sum(dkk_ub, pp_ub, dim=0, clear=True)
-                T.tile.add(pp_ub, pp_ub, dgkn_ring[dslot, 0:block_DK])
-                # dg = q*dq - k*dk + m_last*pp
-                T.tile.broadcast(pp2d_ub, pp_ub, axis=0)
-                T.tile.broadcast(ml2d_ub, ml_ub, axis=1)
-                T.tile.mul(mp2d_ub, pp2d_ub, ml2d_ub)
-                T.tile.mul(dg_ub, q_ub, dq_ub)
-                T.tile.sub(dg_ub, dg_ub, dkk_ub)
-                T.tile.add(dg_ub, dg_ub, mp2d_ub)
-                T.copy(dq_ub, dq[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
-                T.copy(dk_ub, dk[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
-                T.copy(dg_ub, dg[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
+                # 1-late pairing: drain(j) waits the set raised at iteration
+                # j-1 (and drain(0) waits the prologue head-set) on slot 10
+                T.wait_cross_flag(10, "V")
+                for bk in range(NK):
+                    dk0 = bk * block_DK
+                    # single fused readback (dq | dk | dgm in one copy)
+                    T.copy(
+                        ddr_relay[cid, dslot * NK + bk, 0 : 2 * BS + block_DK, 0:block_DK],
+                        ddr_ub,
+                    )
+                    T.copy(G[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], g_ub)
+                    T.copy(G[bb, s0 + BS - 1, bh, dk0 : dk0 + block_DK], gn_ub)
+                    T.copy(Q[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], q_ub)
+                    T.copy(K[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK], k_ub)
+                    # ln2 pre-fold (one [BS,bDK] mul saved; rounding ~2e-7 << rtol)
+                    T.tile.mul(g_ub, g_ub, LN2)
+                    T.tile.mul(gn_ub, gn_ub, LN2)
+                    # dq = dq_raw * scale * 2^g (in place in the ddr row band)
+                    T.tile.exp(gexp_ub, g_ub)
+                    T.tile.mul(ddr_ub[0:BS, 0:block_DK], ddr_ub[0:BS, 0:block_DK], gexp_ub)
+                    if scale != 1.0:
+                        T.tile.mul(ddr_ub[0:BS, 0:block_DK], ddr_ub[0:BS, 0:block_DK], scale)
+                    # dgk = diag(dgm) * 2^gn: scratch-free gather extraction
+                    T.tile.gather(
+                        dgkn_ub,
+                        ddr_ub[2 * BS : 2 * BS + block_DK, 0:block_DK],
+                        dgk_off_u32,
+                        0,
+                    )
+                    T.tile.exp(gnexp_ub, gn_ub)
+                    T.tile.mul(dgkn_ub, dgkn_ub, gnexp_ub)
+                    # dk = dk_raw * 2^(gn - g): broadcast gate without scratch
+                    if block_DK == 64:
+                        # 256B row window: transpose + row_expand_sub + sign fix
+                        T.tile.transpose(gexp_ub, g_ub)  # gT (gexp is dead here)
+                        T.tile.row_expand_sub_experiment(gexp_ub, gexp_ub, gn_ub, gexp_tmp)
+                        T.tile.mul(gexp_ub, gexp_ub, -1.0)  # keep exp arg exact
+                        T.tile.exp(gexp_ub, gexp_ub)
+                        T.tile.transpose(gnd_ub, gexp_ub)
+                    else:
+                        # bDK=32 (128B rows): literal row-Sub chain
+                        for t in T.unroll(BS):
+                            T.tile.sub(gnd_ub[t, 0:block_DK], gn_ub, g_ub[t, 0:block_DK])
+                        T.tile.exp(gnd_ub, gnd_ub)
+                    T.tile.mul(
+                        ddr_ub[BS : 2 * BS, 0:block_DK],
+                        ddr_ub[BS : 2 * BS, 0:block_DK],
+                        gnd_ub,
+                    )
+                    # dkk = dk * k (double duty: dg negative term + tree input)
+                    T.tile.mul(dkk_ub, ddr_ub[BS : 2 * BS, 0:block_DK], k_ub)
+                    T.tile.mul(dg_ub, q_ub, ddr_ub[0:BS, 0:block_DK])
+                    T.tile.sub(dg_ub, dg_ub, dkk_ub)
+                    # pp = sum_t dkk: literal 6-level halving tree (no scratch)
+                    for t0, kk0 in T.Parallel(32, block_DK):
+                        dkk_ub[t0, kk0] = dkk_ub[t0, kk0] + dkk_ub[t0 + 32, kk0]
+                    for t1, kk1 in T.Parallel(16, block_DK):
+                        dkk_ub[t1, kk1] = dkk_ub[t1, kk1] + dkk_ub[t1 + 16, kk1]
+                    for t2, kk2 in T.Parallel(8, block_DK):
+                        dkk_ub[t2, kk2] = dkk_ub[t2, kk2] + dkk_ub[t2 + 8, kk2]
+                    for t3, kk3 in T.Parallel(4, block_DK):
+                        dkk_ub[t3, kk3] = dkk_ub[t3, kk3] + dkk_ub[t3 + 4, kk3]
+                    for t4, kk4 in T.Parallel(2, block_DK):
+                        dkk_ub[t4, kk4] = dkk_ub[t4, kk4] + dkk_ub[t4 + 2, kk4]
+                    for kk5 in T.Parallel(block_DK):
+                        dkk_ub[0, kk5] = dkk_ub[0, kk5] + dkk_ub[1, kk5]
+                    # pp += dgk; last-row single-row injection (no broadcast)
+                    T.tile.add(dkk_ub[0, 0:block_DK], dkk_ub[0, 0:block_DK], dgkn_ub[0:block_DK])
+                    T.tile.add(
+                        dg_ub[BS - 1, 0:block_DK],
+                        dg_ub[BS - 1, 0:block_DK],
+                        dkk_ub[0, 0:block_DK],
+                    )
+                    # 3 GM writes (dw was stored by the C side)
+                    T.copy(ddr_ub[0:BS, 0:block_DK], dq[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
+                    T.copy(ddr_ub[BS : 2 * BS, 0:block_DK], dk[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
+                    T.copy(dg_ub, dg[bb, s0 : s0 + BS, bh, dk0 : dk0 + block_DK])
 
     return main
 
 
-def fla_chunk_inter_bwd(q, k, v, g, h, dv, do, dh, scale=1.0, chunk_size=64):
-    """Host wrapper (proto schema alias): domain/dtype asserts + kernel call.
+def fla_chunk_inter_bwd(q, k, v, g, h, dv, do, dh, scale=1.0, chunk_size=64, block_DK=None):
+    """Host API (upstream chunk_kda_bwd_dqkwg semantics, minus the unused w).
 
-    No view/reshape/permute/contiguous on any NPU tensor: the 8 inputs are
-    passed through with their native bshd / 5D layouts and LastRow is a
-    per-device cached constant input. Relay workspaces are framework-managed
-    (workspace_idx auto-allocation).
+    All fp32, bshd/5D contiguous layouts, directly consumed by the kernel
+    (zero view / zero reshape / zero aclnn on the host path). Returns
+    (dq, dk, dw, dg), each [B, S, H, DK] fp32.
     """
-    B, S, Hn, DK = q.shape
+    B, S, H, DK = q.shape
     DV = v.shape[-1]
-    _check_shape(B, S, Hn, DK, DV, chunk_size)
-    for name, t in (("q", q), ("k", k), ("v", v), ("g", g), ("h", h), ("dv", dv), ("do", do), ("dh", dh)):
-        assert t.dtype == torch.float32, f"fla_chunk_inter: fp32-only operator, got {name}.dtype={t.dtype}"
-    # Stage 3 iteration 5: double the DK tile (half the task count, ~-40%
-    # total Vector-side bytes) when DK is 64-divisible AND DV >= 128. The DV
-    # guard keeps every supported shape on a verified-clean reduce_2d dim=1
-    # terminal: [32,*] and [64,>=128] are empirically clean, the exact [64,64]
-    # combination corrupts (toolchain reduce_2d_v2 Plan/scratch defect,
-    # isolated by the DK/DV matrix in perf_log iteration 5). block_DK stays a
-    # performance parameter, not a dispatch predicate (family _pick_block_dk
-    # precedent in fla_chunk_o).
-    block_DK = 64 if (DK % 64 == 0 and DV >= 128) else 32
-    kernel = fla_chunk_inter(
-        B=B, S=S, H=Hn, DK=DK, DV=DV, scale=scale, chunk_size=chunk_size, block_DK=block_DK
-    )
-    return kernel(q, k, v, g, h, dv, do, dh, get_last_row())
+    block_DK = _check_shape(B, S, H, DK, DV, chunk_size, block_DK)
+    for name, t in (
+        ("q", q),
+        ("k", k),
+        ("v", v),
+        ("g", g),
+        ("h", h),
+        ("dv", dv),
+        ("do", do),
+        ("dh", dh),
+    ):
+        if t.dtype is not torch.float32:
+            raise ValueError(f"input '{name}' must be float32 (fp32-only operator)")
+        if not t.is_contiguous():
+            raise ValueError(f"input '{name}' must be contiguous")
+    if tuple(h.shape[1:3]) != (S // chunk_size, H) or h.shape[3] != DK:
+        raise ValueError(f"h shape {tuple(h.shape)} mismatched with (B, S//64, H, DK, DV)")
+    if tuple(dh.shape) != tuple(h.shape):
+        raise ValueError(f"dh shape {tuple(dh.shape)} must equal h shape {tuple(h.shape)}")
+    kernel = fla_chunk_inter(B, S, H, DK, DV, scale, chunk_size, block_DK)
+    return kernel(q, k, v, g, h, dv, do, dh)
+
+
+__all__ = [
+    "fla_chunk_inter",
+    "fla_chunk_inter_bwd",
+    "_check_shape",
+    "PASS_CONFIGS",
+]
