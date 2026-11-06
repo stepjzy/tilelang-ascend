@@ -1,0 +1,11 @@
+Testing fla_chunk_inter L0 l0_min with shape=(1, 128, 2, 64, 64)
+Test pass! dq: matched_ratio=1.0000 max_abs=4.578e-05
+Test pass! dk: matched_ratio=1.0000 max_abs=1.831e-04
+Test pass! dw: matched_ratio=1.0000 max_abs=9.537e-06
+Test pass! dg: matched_ratio=1.0000 max_abs=2.441e-04
+Testing fla_chunk_inter L1 l1_bench with shape=(1, 8192, 64, 128, 128)
+Test pass! dq: matched_ratio=1.0000 max_abs=3.510e-04
+Test pass! dk: matched_ratio=1.0000 max_abs=1.709e-03
+Test pass! dw: matched_ratio=1.0000 max_abs=4.196e-05
+Test pass! dg: matched_ratio=1.0000 max_abs=2.930e-03
+Kernel Output Match!
