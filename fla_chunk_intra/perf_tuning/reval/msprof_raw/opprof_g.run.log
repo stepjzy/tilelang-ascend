@@ -1,0 +1,47 @@
+[WARN]  /tmp/reval_prof/ is not recommended to be writable by group or other users
+=================================================================
+                   >>>>>   MindStudio   <<<<<
+    THE END-TO-END TOOLCHAIN TO UNLEASH HUAWEI ASCEND COMPUTE
+=================================================================
+
+[W1105 10:38:10.012839514 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[INFO]  Op profiling analysis start.
+[INFO]  Running device task: DeviceProf
+[W1105 10:38:23.350887272 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[2026-11-05 02:38:35] [71604] [ProfDataCollect.cpp:1270] [INFO] Start profiling on device 0, kernel: main_kernel
+[2026-11-05 02:38:36] [71604] [ProfDataCollect.cpp:1307] [INFO] Warm Up enabled. times:10
+[probe] g done
+[INFO]  Profiling running finished. All task success.
+[INFO]  Start analyze kernel on device: device0, kernel: main_kernel, name is: 0
+[INFO]  Save profiling data with metric [PipeUtilization] success.
+[INFO]  Save profiling data with metric [ArithmeticUtilization] success.
+[INFO]  Save profiling data with metric [L2Cache] success.
+[INFO]  Save profiling data with metric [Memory] success.
+[INFO]  Save profiling data with metric [ResourceConflictRatio] success.
+[INFO]  Save profiling data with metric [MemoryL0] success.
+[INFO]  Save profiling data with metric [MemoryUB] success.
+[INFO]  Performance Summary Report:
+
+	1) aicore MTE1 bandwidth utilization lower than 80% when active.
+	2) aicore MTE2 bandwidth utilization lower than 80% when active.
+	3) aicore MTE3 bandwidth utilization lower than 80% when active.
+	4) aicore compute usage lower than 20%.
+	5) aivector MTE2 bandwidth utilization lower than 80% when active.
+	6) aivector MTE3 bandwidth utilization lower than 80% when active.
+	7) aivector compute usage lower than 20%.
+
+[INFO]  Operator Basic Information:
+
+	Op Name: main_kernel
+	Op Type: mix
+	Task Duration(us): 1170.400024
+	Block Dim: 8192
+	Mix Block Dim: 16
+	Device Id: 0
+	Pid: 71604
+	Current Freq: 1800
+	Rated Freq: 1800
+
+[INFO]  Profiling results saved in /tmp/reval_prof/opprof_g/OPPROF_20261105103807_CYNUWWZRNKYPWVYO
+[INFO]  Profiling data parse finished.
+[INFO]  Op profiling finish. Welcome to next use.

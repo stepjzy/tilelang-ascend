@@ -1,0 +1,10 @@
+[W1105 10:53:29.814338789 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[W1105 10:53:35.077244009 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[DIAG] A1 stage_alone  = 755.4 us
+[DIAG] A2 gemm_alone   = 954.0 us
+[DIAG] B  chain        = 1755.7 us
+[DIAG] C1 in_chain_stage  = 734.8 us (min 699.6)
+[DIAG] C2 in_chain_gemm+gap = 1211.6 us (min 1172.7)
+[DIAG] D  host_launch_per_call = 1450.2 us (wall, incl. workspace allocs)
+[DIAG] E  workspace_alloc_set = 70.8 us (5 tensors, cached)
+[DIAG] DONE

@@ -25,6 +25,16 @@ CANN 跨核 flag「16 槽硬截断」的实锤定位法（40 个 flag ID 全碰�
 - 交付文件：`examples_experiment/dsa_sparse_finetune/example_fla_chunk_intra.py`（1428 行）+ `test_example_fla_chunk_intra.py`（215 行）；交付测试 4 用例全绿（含 bench shape）
 - PR 文稿：本目录 `PR_DESCRIPTION.md`（dev-journal 权威正本）
 
+## 新环境重验证（2026-11-06，分设架构）
+
+- 流程：按 2026-11 新版 tilelang-op-migration skill 重走——cannlab 拉起 `DevEnvC_DCbyi_npu`（1×910B3 + 22vCPU ARM host）、基线对账（双端 463c234c 一致）、journal 恢复沙箱（md5 一致）、远程执行全部验证、产物当轮取回
+- 精度：`--level all` **90 项全过**（59 PRECISION_PASS + 31 BOUNDARY_PASS，0 FAIL 0 WARN），与旧环境套件逐项一致
+- 性能（纯 kernel 主口径，msprof Task Duration）：fwd 10395.1 + bwd 793.0 = **11188.1us**，在验收带 ≈11.5ms 内**达标**；逐 kernel pipe 签名与旧环境同构（设备侧无退化）
+- 性能（do_bench 补充口径）：新环境 12105.3us vs 旧环境 11442.8——差异全部来自 **bwd 链 host 分发地板**（新环境 host 每链调用 1450us > 设备工作量 793us，逐 rep 暴露空隙；fwd device-bound 不受影响 +2.6%）；gap 探针 A-E 五组证据见 `perf_tuning/reval/reval_summary.md`
+- 双口径画像归档：`perf_tuning/reval/msprof_raw/`（8×OPPROF CSV 口径，50MB 全量）+ `perf_tuning/reval/prof_app_intra_reval.tar.gz`（应用级 PROF，Insight 图形化口径，21MB）
+- 口径决策（用户，2026-11-06）：**PR 性能主口径 = 纯 kernel 时间**；do_bench 为上游样例对齐口径补充披露；540us 原目标维持物理不可达结论
+- 新增上游反馈项：host 分发路径（~0.7ms/launch，新 CANN/HDK 运行时 + ARM host）需 AclGraph/launch 批量化配合
+
 ## 遗留疑问 / 未走通的路
 
 - k_inter drain mask 乘（估算 -0.25ms）被 planner UB 预算（192KB 贴线）+ 语句重排确定性挂死阻断——planner 别名/屏障鲁棒性改进后可重试。

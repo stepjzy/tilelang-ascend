@@ -1,0 +1,28 @@
+[INFO] Start profiling....
+[W1105 10:43:15.144770500 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[W1105 10:43:27.665803977 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[SELFCHK] fwd golden vs blockrec: Aqk max_diff=0.000e+00 Akk max_diff=0.000e+00
+[SELFCHK] bwd golden vs upstream-loop dq2: max_diff=2.220e-14
+[SELFCHK] bwd golden vs upstream-loop dk2: max_diff=8.527e-14
+[SELFCHK] bwd golden vs upstream-loop dg2: max_diff=8.527e-14
+[SELFCHK] bwd golden vs upstream-loop dbp: max_diff=7.105e-14
+[SELFCHK] PASS
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.777 ms (10777.1 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.894 ms (1893.8 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 12670.9 us
+[INFO] Start export data in PROF_000001_20261105104326258_00078632MNPHOAHK.
+Thu 05 Nov 2026 10:45:10 [INFO] [MSVP] [81253] msprof_cpp_pipeline.py: Run full C pipeline.
+Thu 05 Nov 2026 10:45:17 [INFO] [MSVP] [81253] msprof_cpp_pipeline.py: Full C pipeline completed.
+Thu 05 Nov 2026 10:45:18 [INFO] [MSVP] [81474] msprof_cpp_pipeline.py: Run full C pipeline.
+Thu 05 Nov 2026 10:45:18 [INFO] [MSVP] [81474] msprof_cpp_pipeline.py: Full C pipeline completed.
+[INFO] Export all data in PROF_000001_20261105104326258_00078632MNPHOAHK done.
+[INFO] Start query data in PROF_000001_20261105104326258_00078632MNPHOAHK.
+Job Info	Device ID	Dir Name	Collection Time           	Model ID	Iteration Number	Top Time Iteration	Rank ID	
+
+NA      	         	host    	2026-11-05 10:43:27.347274	N/A     	N/A             	N/A               	-1     	
+
+NA      	0        	device_0	2026-11-05 10:43:27.350128	N/A     	N/A             	N/A               	-1     	
+
+[INFO] Query all data in PROF_000001_20261105104326258_00078632MNPHOAHK done.
+[INFO] Profiling finished.
+[INFO] Process profiling data complete. Data is saved in /tmp/reval_prof/prof_app/PROF_000001_20261105104326258_00078632MNPHOAHK

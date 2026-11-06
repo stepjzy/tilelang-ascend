@@ -1,0 +1,100 @@
+[W1105 09:27:25.713821148 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[W1105 09:27:30.259376897 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[SELFCHK] fwd golden vs blockrec: Aqk max_diff=0.000e+00 Akk max_diff=0.000e+00
+[SELFCHK] bwd golden vs upstream-loop dq2: max_diff=2.220e-14
+[SELFCHK] bwd golden vs upstream-loop dk2: max_diff=8.527e-14
+[SELFCHK] bwd golden vs upstream-loop dg2: max_diff=8.527e-14
+[SELFCHK] bwd golden vs upstream-loop dbp: max_diff=7.105e-14
+[SELFCHK] PASS
+[PRECISION_PASS] l0:l0_fwd_min Aqk shape=(1,64,2,128) matched_ratio=1.000000 max_abs=3.906e-03
+[PRECISION_PASS] l0:l0_fwd_min Akk shape=(1,64,2,128) matched_ratio=1.000000 max_abs=4.883e-04
+[PRECISION_PASS] l0:l0_fwd_repr Aqk shape=(2,256,4,128) matched_ratio=1.000000 max_abs=7.812e-03
+[PRECISION_PASS] l0:l0_fwd_repr Akk shape=(2,256,4,128) matched_ratio=1.000000 max_abs=1.562e-02
+[PRECISION_PASS] l0:l0_fwd_dk64 Aqk shape=(1,128,4,64) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l0:l0_fwd_dk64 Akk shape=(1,128,4,64) matched_ratio=1.000000 max_abs=4.883e-04
+[PRECISION_PASS] l0:l0_fwd_bench_repr Aqk shape=(1,1024,64,128) matched_ratio=1.000000 max_abs=3.125e-02
+[PRECISION_PASS] l0:l0_fwd_bench_repr Akk shape=(1,1024,64,128) matched_ratio=1.000000 max_abs=1.250e-01
+[PRECISION_PASS] l0:l0_bwd_min dq2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=4.578e-05
+[PRECISION_PASS] l0:l0_bwd_min dk2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=6.104e-05
+[PRECISION_PASS] l0:l0_bwd_min dg2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=7.629e-05
+[PRECISION_PASS] l0:l0_bwd_min db_post shape=(1,64,2,128) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_min dg_post shape=(1,64,2,128) matched_ratio=0.999939 max_abs=2.670e-04
+[PRECISION_PASS] l0:l0_bwd_repr dq2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=7.629e-05
+[PRECISION_PASS] l0:l0_bwd_repr dk2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=1.831e-04
+[PRECISION_PASS] l0:l0_bwd_repr dg2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l0:l0_bwd_repr db_post shape=(2,256,4,128) matched_ratio=1.000000 max_abs=1.311e-04
+[PRECISION_PASS] l0:l0_bwd_repr dg_post shape=(2,256,4,128) matched_ratio=0.999882 max_abs=4.883e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dq2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=9.155e-05
+[PRECISION_PASS] l0:l0_bwd_dk64 dk2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dg2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 db_post shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.068e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dg_post shape=(1,128,4,64) matched_ratio=1.000000 max_abs=2.747e-04
+[PRECISION_PASS] l1:l1_fwd_min Aqk shape=(1,64,1,64) matched_ratio=1.000000 max_abs=3.052e-05
+[PRECISION_PASS] l1:l1_fwd_min Akk shape=(1,64,1,64) matched_ratio=1.000000 max_abs=9.537e-07
+[PRECISION_PASS] l1:l1_fwd_dk96 Aqk shape=(2,192,3,96) matched_ratio=1.000000 max_abs=9.766e-04
+[PRECISION_PASS] l1:l1_fwd_dk96 Akk shape=(2,192,3,96) matched_ratio=1.000000 max_abs=7.812e-03
+[PRECISION_PASS] l1:l1_fwd_scale Aqk shape=(1,128,2,128) matched_ratio=1.000000 max_abs=4.883e-04
+[PRECISION_PASS] l1:l1_fwd_scale Akk shape=(1,128,2,128) matched_ratio=1.000000 max_abs=9.766e-04
+[PRECISION_PASS] l1:l1_bwd_min dq2 shape=(1,64,1,64) matched_ratio=1.000000 max_abs=3.052e-05
+[PRECISION_PASS] l1:l1_bwd_min dk2 shape=(1,64,1,64) matched_ratio=1.000000 max_abs=6.104e-05
+[PRECISION_PASS] l1:l1_bwd_min dg2 shape=(1,64,1,64) matched_ratio=1.000000 max_abs=6.104e-05
+[PRECISION_PASS] l1:l1_bwd_min db_post shape=(1,64,1,64) matched_ratio=1.000000 max_abs=6.104e-05
+[PRECISION_PASS] l1:l1_bwd_min dg_post shape=(1,64,1,64) matched_ratio=1.000000 max_abs=1.144e-04
+[PRECISION_PASS] l1:l1_bwd_dk96 dq2 shape=(2,192,3,96) matched_ratio=1.000000 max_abs=9.155e-05
+[PRECISION_PASS] l1:l1_bwd_dk96 dk2 shape=(2,192,3,96) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l1:l1_bwd_dk96 dg2 shape=(2,192,3,96) matched_ratio=1.000000 max_abs=1.831e-04
+[PRECISION_PASS] l1:l1_bwd_dk96 db_post shape=(2,192,3,96) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l1:l1_bwd_dk96 dg_post shape=(2,192,3,96) matched_ratio=0.999919 max_abs=4.120e-04
+[PRECISION_PASS] l1:l1_valrange_s dq2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=2.861e-06
+[PRECISION_PASS] l1:l1_valrange_s dk2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=3.815e-06
+[PRECISION_PASS] l1:l1_valrange_s dg2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=1.490e-06
+[PRECISION_PASS] l1:l1_valrange_s db_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=2.623e-06
+[PRECISION_PASS] l1:l1_valrange_s dg_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=3.293e-06
+[PRECISION_PASS] l1:l1_valrange_m dq2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=9.155e-05
+[PRECISION_PASS] l1:l1_valrange_m dk2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=6.104e-04
+[PRECISION_PASS] l1:l1_valrange_m dg2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=9.766e-04
+[PRECISION_PASS] l1:l1_valrange_m db_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=3.662e-04
+[PRECISION_PASS] l1:l1_valrange_m dg_post shape=(1,128,2,64) matched_ratio=0.999878 max_abs=1.465e-03
+[PRECISION_PASS] l1:l1_valrange_l dq2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l1:l1_valrange_l dk2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=1.221e-03
+[PRECISION_PASS] l1:l1_valrange_l dg2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=3.418e-03
+[PRECISION_PASS] l1:l1_valrange_l db_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=1.221e-03
+[PRECISION_PASS] l1:l1_valrange_l dg_post shape=(1,128,2,64) matched_ratio=0.999695 max_abs=4.883e-03
+[PRECISION_PASS] l1:l1_valrange_asym dq2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=1.526e-04
+[PRECISION_PASS] l1:l1_valrange_asym dk2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l1:l1_valrange_asym dg2 shape=(1,128,2,64) matched_ratio=1.000000 max_abs=3.662e-04
+[PRECISION_PASS] l1:l1_valrange_asym db_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=9.766e-04
+[PRECISION_PASS] l1:l1_valrange_asym dg_post shape=(1,128,2,64) matched_ratio=1.000000 max_abs=1.953e-03
+[BOUNDARY_PASS] l2:l2_s_tail1: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_s_prime: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_s_tailmid: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_dk_tail1: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_dk_prime: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_dk_tailmid: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_fwd_s_nonmult: rejected (RuntimeError)
+[BOUNDARY_PASS] l2:l2_chunk_size: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_sub_chunk: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_fwd_dtype_fp16: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_bwd_dtype_bf16: rejected (ValueError)
+[BOUNDARY_PASS] l2:l2_noncontig: rejected (ValueError)
+[BOUNDARY_PASS] boundary:bnd_fwd_zero Aqk dtype=bfloat16 matched_ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] boundary:bnd_fwd_zero Akk dtype=bfloat16 matched_ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] boundary:bnd_bwd_zero dq2 dtype=float32 matched_ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] boundary:bnd_bwd_zero dk2 dtype=float32 matched_ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] boundary:bnd_bwd_zero dg2 dtype=float32 matched_ratio=1.0000 max_abs=0.000e+00
+[BOUNDARY_PASS] boundary:bnd_fwd_decay Aqk dtype=bfloat16 matched_ratio=1.0000 max_abs=2.384e-07
+[BOUNDARY_PASS] boundary:bnd_fwd_decay Akk dtype=bfloat16 matched_ratio=1.0000 max_abs=7.451e-09
+[BOUNDARY_PASS] boundary:bnd_bwd_decay dq2 dtype=float32 matched_ratio=0.9977 max_abs=3.152e-04
+[BOUNDARY_PASS] boundary:bnd_bwd_decay dk2 dtype=float32 matched_ratio=0.9972 max_abs=4.497e-04
+[BOUNDARY_PASS] boundary:bnd_bwd_decay dg2 dtype=float32 matched_ratio=0.9957 max_abs=8.788e-04
+[BOUNDARY_PASS] boundary:bnd_bwd_decay db2 dtype=float32 matched_ratio=1.0000 max_abs=1.556e-03
+[BOUNDARY_PASS] boundary:bnd_bwd_inf dq2 dtype=float32 matched_ratio=1.0000 max_abs=2.098e-05
+[BOUNDARY_PASS] boundary:bnd_bwd_inf dk2 dtype=float32 matched_ratio=1.0000 max_abs=6.104e-05
+[BOUNDARY_PASS] boundary:bnd_bwd_inf dg2 dtype=float32 matched_ratio=1.0000 max_abs=4.578e-05
+[BOUNDARY_PASS] boundary:bnd_fwd_nan Aqk dtype=bfloat16 matched_ratio=1.0000 max_abs=9.537e-07
+[BOUNDARY_PASS] boundary:bnd_fwd_nan Akk dtype=bfloat16 matched_ratio=1.0000 max_abs=8.345e-07
+[BOUNDARY_PASS] boundary:bnd_bwd_nan dq2 dtype=float32 matched_ratio=1.0000 max_abs=2.098e-05
+[BOUNDARY_PASS] boundary:bnd_bwd_nan dk2 dtype=float32 matched_ratio=1.0000 max_abs=6.104e-05
+[BOUNDARY_PASS] boundary:bnd_bwd_nan dg2 dtype=float32 matched_ratio=1.0000 max_abs=4.578e-05
+[BOUNDARY] all boundary cases passed
+Test Passed!

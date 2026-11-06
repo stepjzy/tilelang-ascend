@@ -1,0 +1,43 @@
+[WARN]  /tmp/reval_prof/ is not recommended to be writable by group or other users
+=================================================================
+                   >>>>>   MindStudio   <<<<<
+    THE END-TO-END TOOLCHAIN TO UNLEASH HUAWEI ASCEND COMPUTE
+=================================================================
+
+[W1105 10:37:34.794782433 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[INFO]  Op profiling analysis start.
+[INFO]  Running device task: DeviceProf
+[W1105 10:37:46.781380732 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[2026-11-05 02:37:59] [70521] [ProfDataCollect.cpp:1270] [INFO] Start profiling on device 0, kernel: main_kernel
+[2026-11-05 02:37:59] [70521] [ProfDataCollect.cpp:1307] [INFO] Warm Up enabled. times:10
+[probe] subst done
+[INFO]  Profiling running finished. All task success.
+[INFO]  Start analyze kernel on device: device0, kernel: main_kernel, name is: 0
+[INFO]  Save profiling data with metric [PipeUtilization] success.
+[INFO]  Save profiling data with metric [ArithmeticUtilization] success.
+[INFO]  Save profiling data with metric [L2Cache] success.
+[INFO]  Save profiling data with metric [Memory] success.
+[INFO]  Save profiling data with metric [ResourceConflictRatio] success.
+[INFO]  Save profiling data with metric [MemoryL0] success.
+[INFO]  Save profiling data with metric [MemoryUB] success.
+[INFO]  Performance Summary Report:
+
+	1) MTE2 bandwidth utilization lower than 80% when active.
+	2) MTE3 bandwidth utilization lower than 80% when active.
+	3) aivector compute usage lower than 20%.
+
+[INFO]  Operator Basic Information:
+
+	Op Name: main_kernel
+	Op Type: vector
+	Task Duration(us): 2822.259766
+	Block Dim: 8192
+	Mix Block Dim: 
+	Device Id: 0
+	Pid: 70521
+	Current Freq: 1800
+	Rated Freq: 1800
+
+[INFO]  Profiling results saved in /tmp/reval_prof/opprof_subst/OPPROF_20261105103731_UEHCPUFFHQCOMYEH
+[INFO]  Profiling data parse finished.
+[INFO]  Op profiling finish. Welcome to next use.

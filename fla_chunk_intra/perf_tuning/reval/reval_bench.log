@@ -1,0 +1,16 @@
+=== RUN1 ===
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.359 ms (10358.5 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.756 ms (1755.7 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 12114.2 us
+=== RUN2 ===
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.507 ms (10506.8 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.680 ms (1680.0 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 12186.8 us
+=== RUN3 ===
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.374 ms (10373.8 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.621 ms (1620.5 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 11994.4 us
+=== RUN4 ===
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.478 ms (10477.7 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.648 ms (1648.1 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 12125.7 us
