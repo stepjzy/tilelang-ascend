@@ -10,7 +10,8 @@ CANN 跨核 flag「16 槽硬截断」的实锤定位法（40 个 flag ID 全碰�
 2. DESIGN.md（60min）→ masked-GEMM 重表述消循环携带依赖、C/V 多跳限制下的 kernel 拆分与内存预算（UB/L1/L0C 表）、§9.5 性能预算（唯一 IO 1044MB ÷ 1263GB/s = 826us 物理下限）与被否方案
 3. debug_log.md（40min）→ 核心坑：G4 UB 窄 region 作 UB→GM 源的打包错位（打包整块中转修复）；G6/G7 flag 16 槽截断 + zN 布局约束（推翻 v3 单 kernel slab 方案）；G11 H=1 的 32B 槽散布；G13 0×NaN 穿越；attempt-1 数学 bug（D_s/V_s 后置缩放从未应用——flag 修好也算不对）
 4. perf_tuning/fla_chunk_intra_final_summary.md（40min）→ 基线 19774 → 11443us（-42.1%）怎么来的：锚点消去/中点锚点超级 GEMM、预分裂 ws 直读链、k_g 拆分、fixed-core 任务循环；R2 地板核算（fwd 合成地板 9.8ms 贴线 1.04×、bwd 传输地板）
-5. history_version/（30min）→ 被否决路线差在哪：单 kernel bwd（flag 截断 + zN 约束双重推翻）、ILP 交织（+2.5%）、threads=2（+47%，两方向双重证伪）、k_y frag 协议（-1.1% 子阈值）
+5. perf_tuning/fla_chunk_intra_opprof_rounds.tar.gz（2026-11-06 补归档）→ 19 轮 msprof op 原始画像数据（CSV+dump，解压后可脚本/Excel 分析各轮逐 pipe 读数，印证上述 md 结论的归因）
+6. history_version/（30min）→ 被否决路线差在哪：单 kernel bwd（flag 截断 + zN 约束双重推翻）、ILP 交织（+2.5%）、threads=2（+47%，两方向双重证伪）、k_y frag 协议（-1.1% 子阈值）
 
 ## 三大关键决策
 
