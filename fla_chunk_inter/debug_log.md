@@ -169,3 +169,24 @@ format-check=success（全绿）；ruff 双过。
 **教训（skill-journal 候选）**：交付路径必须在 Phase 3 建 worktree 后即按
 镜像规则推导，且列入交付清单向用户展示确认（本会话两次 PR 修复均源于
 交付前缺少该核对步骤）。
+
+## Attempt PR-CI3: PR#1994 交付文件命名修正（2026-11-09，文件命名镜像规则）
+
+**分类**：交付命名规则违反（新版 skill「文件命名同样镜像，不另加前缀」）
+**现象**：交付文件为 example_fla_chunk_inter.py + test_example_fla_chunk_inter.py
+——新版 skill 明确：实现文件 = <源文件基名>.py、测试 = test_<源文件基名>.py；
+example_/test_example_ 前缀（#1887/#1953 已合入形态）为历史遗留，新迁移一律
+不再使用。
+**修正**：git mv 两文件至 fla_chunk_inter.py + test_fla_chunk_inter.py
+（同目录 examples_experiment/kda/FLA_KDA/）；同步修正 test 的 import 行
+（from fla_chunk_inter import）与实现文件冒烟块注释（CI 不收集无前缀实现
+文件，改为手动冒烟入口说明）；kernel 函数 AST 零改动，ruff 双过。
+**验证**：NPU 镜像路径双路径复验——test 路径 Kernel Output Match!（精度
+逐位不变）+ 冒烟路径 [SMOKE_PASS] Test Passed!；amend+force-push 0bf73d17
+（首推遇网络瞬断，重试成功）；PR files API 确认新命名；format-check 绿。
+**CI 状态**：Benchmark Tests 排队中——**仓库级 runner 队列全面拥堵**
+（其他 PR 的 TileLang-Ascend CI 自 08:00 起同样排队，非本 PR 问题；
+同内容旧命名形态已于当日 15:21 CI 全绿 + NPU 双路径验证）。
+**教训（skill-journal 候选）**：镜像规则现在是"路径 + 文件名"双维度——
+交付 checklist 的核对项必须包含文件名（本会话第三次 PR 修复，均源于
+skill 迭代快于交付流程的适配）。
