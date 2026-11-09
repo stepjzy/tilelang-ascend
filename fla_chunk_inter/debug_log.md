@@ -151,3 +151,21 @@ fla_chunk_o 惯例：L0 门 shape + 输出 shape/dtype/finite 断言 +
 __main__ 冒烟块与成功标记——tilelang-example-merge 的交付 checklist 缺此步
 （第一轮交付时恰好没触发是因为当时 example_*.py 不在该 CI 收集范围/或未
 推到受 CI 检查的分支头——本轮才暴露）。
+
+## Attempt PR-CI2: PR#1994 合入路径修正（2026-11-09，交付路径镜像规则）
+
+**分类**：交付路径规则违反（新版 skill Phase 3「交付路径镜像规则」）
+**现象**：PR#1994 交付文件位于 examples_experiment/dsa_sparse_finetune/——
+新版 skill 明确：合入路径唯一由**迁移来源在原主仓的路径**镜像决定
+（examples/ → examples_experiment/，其后一致），沙箱目录与家族先例均为
+错误依据（skill 点名 fla_chunk_o #1953 同款教训）。
+**修正对照**：
+- 迁移来源（Phase 1 记录，ref_gpu 冻结头）：tile-ai/tilelang @
+  examples/kda/FLA_KDA/fla_chunk_inter.py
+- 正确合入路径：examples_experiment/kda/FLA_KDA/（目录不存在随 commit 创建）
+- git mv 两交付文件（内容 md5 零改动）→ amend + force-with-lease 337d4467
+**验证**：PR files API 确认新路径；CI 复跑 Benchmark Tests=success +
+format-check=success（全绿）；ruff 双过。
+**教训（skill-journal 候选）**：交付路径必须在 Phase 3 建 worktree 后即按
+镜像规则推导，且列入交付清单向用户展示确认（本会话两次 PR 修复均源于
+交付前缺少该核对步骤）。

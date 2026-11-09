@@ -48,9 +48,11 @@ NPU 远程执行）下按新 migration skill 的全量重迁移实证（含 flag
 ## 交付物
 
 - 分支 feat/fla-chunk-inter-pr（origin，基于 upstream/ascendc_pto@557b11b8，
-  commit **1a2d4f47**（第二轮终态，AST 等价校验 + ruff 门禁 + NPU 交付件对
-  复验通过）：examples_experiment/dsa_sparse_finetune/{example_fla_chunk_inter.py,
-  test_example_fla_chunk_inter.py}
+  commit **337d4467**（镜像路径修正版，见 debug_log Attempt PR-CI2）：
+  **examples_experiment/kda/FLA_KDA/**{example_fla_chunk_inter.py,
+  test_example_fla_chunk_inter.py}——按新版 skill「交付路径镜像规则」
+  （来源 examples/kda/FLA_KDA/fla_chunk_inter.py → 合入 examples_experiment/
+  kda/FLA_KDA/）；CI 全绿
 - PR: 待用户网页创建（文稿见本目录 PR_DESCRIPTION.md：19556→6741.8us
   前后比对 + 可达值依据，不含目标对比）
 - 性能：第二轮终态 **6741.8us**（do_bench 3 次独立；OPPROF 6502.7 /
