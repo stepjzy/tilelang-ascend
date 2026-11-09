@@ -190,3 +190,23 @@ example_/test_example_ 前缀（#1887/#1953 已合入形态）为历史遗留，
 **教训（skill-journal 候选）**：镜像规则现在是"路径 + 文件名"双维度——
 交付 checklist 的核对项必须包含文件名（本会话第三次 PR 修复，均源于
 skill 迭代快于交付流程的适配）。
+
+## Attempt PR-CI4: PR#1994 CI 失败根因——amend 漏 add 的暂存事故（2026-11-09）
+
+**分类**：流程事故（Orchestrator 违反红线 7"提交前核对暂存内容"）
+**现象**：0bf73d17 CI failure——`ModuleNotFoundError: No module named
+'example_fla_chunk_inter'`（test_fla_chunk_inter.py 的 import 指向已改名的
+旧模块）。
+**根因**：git mv 暂存了改名（携带**改名时点的旧内容**——import 行仍是
+from example_fla_chunk_inter）；随后的 python 内容修复只落在工作区，
+amend 前**未 git add** → 提交的是"新文件名 + 旧 import"的坏组合。
+NPU 验证用工作区文件（已修复）→ 全绿；CI 跑提交内容 → 失败。
+"验证通过 ≠ 已提交正确"的教科书案例。
+**修复**：git add 两文件 → 暂存区核验 import 行 → amend（0bcfbd2f）→ push →
+**远端提交内容终验**（git show origin/... 确认两文件均为修复版，不再只看本地
+HEAD）→ CI 复跑 Benchmark Tests = success + format-check = success 全绿。
+**教训（skill-journal 候选，高优）**：①amend 前必须 `git status` 核对暂存与
+工作区差异（红线 7 既有条款，本次未执行）；②force-push 后必须 `git fetch &&
+git show origin/<branch>:<file>` 核验**远端提交内容**——本地 HEAD 正确不代表
+远端正确（本事故中本地一直是对的）；③"内容修复"与"git mv"两个操作后，
+凡再改文件必须显式 add。
