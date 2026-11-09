@@ -128,3 +128,26 @@ attempt1 含 reduce/broadcast scratch 注入 op，其 UB 打包随上下文（�
   2. 收官采集：prof-fla_chunk_inter-r2-final（job 01a1ab46，289s exit 0）——--level all 全绿 →
      do_bench ×3（6734.4/6749.8/6741.3）→ 应用级 msprof PROF（自检 op_summary 13 行非空）→
      tar 79531B cp 回 perf_tuning/fla_chunk_inter_r2_prof_final.tar.gz
+
+## Attempt PR-CI1: PR#1994 CI 失败修复（2026-11-09，提交后首轮 CI）
+
+**分类**：CI 兼容性（交付文件形态，非 kernel 问题）
+**现象**：Benchmark Tests (Ascend NPU) failure——`[FAILED]
+examples_experiment/dsa_sparse_finetune/example_fla_chunk_inter.py (Exit: 0)`：
+退出码 0 但被判失败。`test_example_fla_chunk_inter.py` 同场 PASSED。
+**根因**：CI legacy runner 收集目录下全部 example_*.py/test_*.py 并以
+`python <file>` 直跑，按 stdout 成功标记（如 "Test Passed!"）判定——
+example 文件无 `__main__` 自测块，只有编译日志 → 无标记 → FAILED。
+家族先例 example_fla_chunk_o.py 自带冒烟块（其注释明言 CI runner 行为）。
+**修复**：example_fla_chunk_inter.py 追加 `__main__` 冒烟块（对齐
+fla_chunk_o 惯例：L0 门 shape + 输出 shape/dtype/finite 断言 +
+`[SMOKE_PASS]`/`Test Passed!` 标记；kernel 函数零改动）。
+**验证**：NPU 双路径复验——A: `python example_fla_chunk_inter.py`
+（CI 同款直跑）→ `[SMOKE_PASS] ... Test Passed!`；B: test 对 →
+`Kernel Output Match!`（精度逐位不变）。ruff 双过。
+**结果**：amend + force-with-lease 推送 0ed3739d → CI 复跑
+**Benchmark Tests = success + format-check = success**（全绿）。
+**教训（skill-journal 候选）**：交付 example_*.py 到该目录必须带可直跑的
+__main__ 冒烟块与成功标记——tilelang-example-merge 的交付 checklist 缺此步
+（第一轮交付时恰好没触发是因为当时 example_*.py 不在该 CI 收集范围/或未
+推到受 CI 检查的分支头——本轮才暴露）。
