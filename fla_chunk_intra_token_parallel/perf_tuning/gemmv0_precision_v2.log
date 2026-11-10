@@ -1,0 +1,130 @@
+[W1110 18:47:49.561542351 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[W1110 18:47:53.679523927 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=36, sync_flag_id=0, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=1, sync_flag_id=0, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=77, sync_flag_id=1, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=6, sync_flag_id=1, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 26 ) is not enough to catch up cube loop times (= 52 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=130, sync_flag_id=2, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=11, sync_flag_id=2, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=37, sync_flag_id=3, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=2, sync_flag_id=3, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=78, sync_flag_id=4, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=7, sync_flag_id=4, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:47:54] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 26 ) is not enough to catch up cube loop times (= 52 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=131, sync_flag_id=5, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=12, sync_flag_id=5, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=36, sync_flag_id=0, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=1, sync_flag_id=0, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=77, sync_flag_id=1, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=6, sync_flag_id=1, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=130, sync_flag_id=2, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=11, sync_flag_id=2, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=37, sync_flag_id=3, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=2, sync_flag_id=3, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=78, sync_flag_id=4, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=7, sync_flag_id=4, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:09] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=131, sync_flag_id=5, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=12, sync_flag_id=5, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=36, sync_flag_id=0, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=1, sync_flag_id=0, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=77, sync_flag_id=1, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=6, sync_flag_id=1, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=130, sync_flag_id=2, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=11, sync_flag_id=2, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=37, sync_flag_id=3, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=2, sync_flag_id=3, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=78, sync_flag_id=4, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=7, sync_flag_id=4, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[18:48:22] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=131, sync_flag_id=5, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=12, sync_flag_id=5, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+Testing fla_chunk_intra_token_parallel L0/l0_bench_repr with shape=(1, 1024, 64, 128)
+Init successful!
+Test pass! Aqk: matched_ratio=1.0000 max_abs=6.250e-02
+Test pass! Akk: matched_ratio=1.0000 max_abs=7.812e-03
+Testing fla_chunk_intra_token_parallel L1/l1_aligned with shape=(2, 128, 8, 128)
+Init successful!
+Test pass! Aqk: matched_ratio=1.0000 max_abs=1.953e-03
+Test pass! Akk: matched_ratio=1.0000 max_abs=1.953e-03
+Testing fla_chunk_intra_token_parallel L1/l1_deep_gate with shape=(1, 64, 8, 32)
+Init successful!
+Test pass! deep-gate sentinel: Aqk[1,0] = 0.125 (expected 0.125)
+Test pass! Aqk: matched_ratio=1.0000 max_abs=0.000e+00
+Test pass! Akk: matched_ratio=1.0000 max_abs=0.000e+00
+Testing fla_chunk_intra_token_parallel L1/l1_dk256_bh2 with shape=(1, 64, 8, 256)
+Init successful!
+Test pass! Aqk: matched_ratio=1.0000 max_abs=3.125e-02
+Test pass! Akk: matched_ratio=1.0000 max_abs=4.883e-04
+Test pass! DK=512 rejected: DK=512 exceeds the 192KB unified-buffer budget at every head-group size (SCS=16:...
+Test pass! CS=48/SCS=3 rejected: S=64 must be divisible by chunk_size=48...
+Kernel Output Match!

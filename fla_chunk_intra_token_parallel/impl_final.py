@@ -1,179 +1,46 @@
 """fla_chunk_intra_token_parallel: KDA intra-chunk per-token decay inner
 products Aqk/Akk on Ascend 910B3 (Cube GEMM offload + fixed-core C/V
-software pipeline, iter8 + iter11 C-side double-slot + iter12 V-side
-beta-fold vectorization).
+software pipeline).
 
-Semantics (frozen authority): ref_gpu/fla_chunk_intra_token_parallel.py
-(Triton chunk_kda_fwd_kernel_intra_token_parallel). Code-level origin:
-ref_gpu/fla_chunk_intra_token_parallel_tilelang_gpu.py (upstream TileLang
-CUDA, token-parallel). For token i in subchunk [i_ts, i_ts+SCS) and
-j in [i_ts, min(i+1, i_ts+SCS)):
+Semantics (upstream FLA/FLA_KDA Triton kernel; for token i in subchunk
+[i_ts, i_ts+SCS), j in [i_ts, min(i+1, i_ts+SCS))):
 
-    kgj[h, d] = k[b, j, h, d] * 2^(g[b, i, h, d] - g[b, j, h, d])
-    Aqk[b, i, h, j % CS]        = scale * sum_d q[b, i, h, d] * kgj[h, d]
-    Akk[b, i, h, j - i_ts]      = (j < i) ? sum_d (beta[b,i,h]*k[b,i,h,d]) * kgj[h, d] : 0
+    kgj = k[b, j] * 2^(g[b, i] - g[b, j])
+    Aqk[b, i, h, j % CS]   = scale * sum_d q[b, i, h, d] * kgj[h, d]
+    Akk[b, i, h, j - i_ts] = (j < i) ? sum_d (beta*k[b, i]) * kgj : 0
 
-Aqk columns not covered by any j stay 0 (cleared-row semantics, upstream
-TileLang version); the Akk diagonal (j == i) stays 0. scale is fixed at 1.0
-(upstream test configuration; not passed through).
+Aqk columns not covered by any j stay 0; the Akk diagonal stays 0.
 
-Ascend restructuring (DESIGN_fla_chunk_intra_token_parallel.md + Stage 3
-iter1/3/7/8; all deviations from the upstream CUDA code are design decisions;
-see perf_tuning/fla_chunk_intra_token_parallel_perf_log.md):
+Implementation, in brief:
+- Tasks are (batch, subchunk, head-group) on a 1-D fixed-core grid
+  (cid, vid), vid splitting the BH head group across the 2 AIVs.
+- Numerics: exp2(x) = exp(x * ln2) with the anchor subtraction done in
+  the RAW log2 domain BEFORE the ln2 scaling (scaled differences
+  collapse to identical fp32 at large |g|); mid-anchor factored decay
+  e_ij = E+_i * E-_j (|g_i - g_anchor| < ~127 keeps E finite); GEMM
+  operands stay fp32 (bf16 rounding alone fails the Akk gate); outputs
+  stage fp32 and CAST_RINT to bf16 in UB.
+- The dot products are offloaded to the Cube cores as block-diagonal
+  batched GEMMs per GGRP-head group (A = [Q'; K''], B = K'; the useful
+  output is the per-head diagonal blocks). GGRP must DIVIDE BH and fit
+  the L0A budget (GGRP*2*SCS*DK*4B <= 64KB) with GGRP*SCS >= 16.
+- Post-GEMM masking is a V-side compare+select (garbage cells can be
+  +-inf under deep decay; a multiply mask would give inf*0 = NaN).
+- Fixed-core task loop with a 2-task-deferred drain: V post-processes
+  task t-2 while constructing task t; C gemms task t. Relays are
+  double-buffered per-core ping-pong slots (workspace_a/b with auto
+  CV-sync; o_relay with manual alternating cross-core flags). Peeled
+  fill iterations avoid the t=0 drain deadlock.
+- The C side consumes the relays with the high-level T.gemm_v0
+  intrinsic (one block-diagonal call per GGRP-head group, operands
+  loaded from the relay slots into L1, results staged through one L0C
+  accumulator into o_relay).
 
-1. Subchunk-parallel logical tasks: one (batch, subchunk, head-group) per
-   task; one-dimensional T.Kernel with (cid, vid) (3-D kernels are
-   unsupported, threads restricted to 1/2; vid splits the BH-head group
-   into BH_V = BH // 2 per AIV).
-2. exp2(x) as exp(x * ln2); all bf16<->fp32 conversions UB-internally; fp32
-   staging + block CAST_RINT + per-head 2D strided writeback bursts
-   (iter1 mechanics, kept).
-3. Factored decay (iter3, mid-anchor a = SCS//2): e_ij = E+_i * E-_j with
-   E+ = exp(g_i - g_a), E- = exp(g_a - g_j); per-head one-shot slabs
-   Q' = q*E+, K' = k*E-, K'' = k*E+. Documented domain restriction: the
-   within-subchunk half-span gate decay |g_i - g_a| < ~127 (log2 domain)
-   keeps E+/E- finite in fp32 (DBOUND sentinel half-span 96, margin 31).
-4. iter7 GEMM OFFLOAD (DESIGN 10.4-D research path, msprof iter6: 20 Cube
-   cores idle while AIV broadcast/reduce dominated 58% of the kernel):
-   the per-(i,j) dot products leave the Vector pipe entirely --
-     Aqk_h = tril(Q'_h @ K'_h^T),   Akk_h = strict_tril((beta*K'')_h @ K'_h^T)
-   via one gemm_v0 per GGRP-head group with block-diagonal batching:
-     A = [Q'; K''] rows of GGRP heads stacked  [GGRP*2*SCS, DK]
-     B = K' rows of the same GGRP heads        [GGRP*SCS,  DK]
-     C = A @ B^T (transpose_B) -> [GGRP*2SCS, GGRP*SCS]; the useful output
-     is the per-head diagonal [2*SCS, SCS] blocks (4x FLOP waste at
-     GGRP=4, measured cheaper than 4x more gemm calls: ggrp=1 benches
-     +168us over ggrp=4 at the bench shape).
-   beta is folded into K'' on the V side (per-row scalar muls, the
-   production beta_f[i*16+h, 0] BufferLoad pattern) so the Akk GEMM
-   result needs no post-folding.
-   fp32 operands (not bf16): bf16 rounding of Q'/K'/K'' alone fails the
-   Akk matched-ratio gate (CPU-simulated 0.9848 < 0.99 vs fp32 1.0000)
-   and costs the same transit bytes as split-bf16; fp32 gemm_v0 keeps the
-   kernel bit-comparable to the iter3 vector version (Aqk bitwise equal).
-   GGRP sizing: min(BH, 4) subject to the L0A single-K-step budget
-   (GGRP*2*SCS*DK*4B <= 64KB) and the L0C/L0B N >= 16 fractal rule
-   (GGRP >= ceil(16/SCS)); requires BH*SCS >= 16.
-5. Post-GEMM masking on the V side via arith_progression + broadcast +
-   compare + select (VSEL_TENSOR_SCALAR_MODE): the block-diagonal garbage
-   cells (j > i) can be +-inf under deep decay (E+_i*E-_j up to 2^180 in
-   the accumulator) -- a multiply mask would give inf*0 = NaN; select
-   REPLACES with 0, matching the golden's masked_fill semantics (the
-   bnd_dbound sentinel passes ratio 1.0000).
-6. Memory-planner interaction (iter7 toolchain findings): region-dst
-   writes do not extend a buffer's planner liveness -- the per-vid
-   operand accumulators a_agg/b_agg must be whole-buffer-filled first
-   (fill anchors the interval), otherwise the planner overlays them with
-   the in-loop fp32 scratches (bc_row/e) and the staged operands get
-   fp32-bytes-read-as-bf16/fp32 corruption. Per-head load staging
-   (q/k/gk loaded inside the factorize loop) keeps the peak UB ~124KB.
-7. iter8 FIXED-CORE C/V SOFTWARE PIPELINE (msprof iter7: AIC 80% busy but
-   mac only 7.1% -- per-task V(construct)->ws->C(gemm)->ws->V(postproc)
-   was fully serial, each core idling through the other's phase).
-   Restructure (fla_chunk_o iter6 template, same toolchain family):
-   - FIXED-CORE grid: T.Kernel(CORE_EFF = min(20, NBLK)) with a strided
-     task map tid = cid + t*CORE_EFF, TPT = ceil(NBLK/CORE_EFF) produce
-     iterations; out-of-range tasks are redirected BRANCH-FREE (Select)
-     to the core's own first task -- the recompute is bit-identical and
-     the garbage drains are overwritten by the real ones, so ZERO
-     IfThenElse statements remain in the loop (each IfThenElse costs two
-     PipeBarrier<PIPE_ALL> drains via AUTO_SYNC).
-   - SOFTWARE-PIPELINED task loop with a 2-TASK-DEFERRED drain: the V
-     side post-processes task t-2 at the TOP of iteration t, then
-     constructs task t's operands; the C side gemms task t in the same
-     iteration. Steady state: V drain(t-2)/produce(t) overlap C gemm(t-1)/
-     gemm(t); V runs (at most) 2 iterations ahead of C, and the manual
-     drain flag (set at C's iteration t-2) is long fired when V arrives,
-     so neither core stalls on the other's CURRENT phase.
-   - DOUBLE-BUFFERED relay slots (NSLOT=2, t % NSLOT): workspace_a/b
-     (V->C operand relay) keep their AUTO_CV_SYNC cross-core flags (the
-     pass keys on the literal buffer-name substring "workspace"; produce
-     and consume are in the SAME loop iteration, so the pass's FIFO
-     index pairing is exactly the required same-iteration edge). The
-     result relay is renamed workspace_r -> o_relay (NON-"workspace"
-     name => NO auto flag): its C->V handoff uses MANUAL cross-core
-     flags T.set_cross_flag("FIX", 3 + t % 2) / T.wait_cross_flag(...)
-     with alternating event IDs so the 2-deferred drain pairs with the
-     FIX of iteration t-2 (auto FIFO flags would pair same-iteration
-     and deadlock: V's drain would wait FIX(t) which waits V's own
-     produce(t)).
-   - WAR safety at NSLOT=2 (both reuses transitively ordered, no extra
-     flags): (a) V produce(t+2) overwrites ws slot t%2 that C gemm(t)
-     reads -- V produce(t+2) follows V drain(t) in V's stream, which
-     waits the manual FIX(t) flag, which C sets only after gemm(t)'s
-     L1 loads are done; (b) C FIX(t+2) overwrites the o_relay slot V
-     drain(t) reads -- FIX(t+2) follows C's wait on V's produce(t+2)
-     relay flag, and V's produce(t+2) MTE3 follows (in-order MTE3 pipe)
-     V drain(t)'s MTE2->Vector->MTE3 chain.
-   - Loop-invariant hoists: the lt/slt masks (arith_progression +
-     broadcasts + compares) are computed ONCE per core (iter7 recomputed
-     them per task); per-task beta staging / staging fills stay inside
-     their phases.
-   - Workspace capacity shrinks from per-task [NBLK, ...] (~640 MiB at
-     the bench shape) to per-core ping-pong [CORE_EFF, NSLOT, ...]
-     (~5 MiB, permanently L2-resident); per-task relay traffic is
-     unchanged.
-    - Peeled fill iterations 0/1 (produce + gemm + FIX + a trailing
-      garbage drain with NO wait, slot 2%NSLOT / 3%NSLOT): avoid the t=0
-      deadlock (produce must precede the first drain) and keep every
-      relay's access-site counts balanced (2 peeled + 1 loop site per
-      relay per side), the fla_chunk_o-proven structure.
- 8. iter11 C-SIDE DOUBLE-SLOT DECOMPOSED PIPELINE (iter10 conclusion:
-    wall is bound by the ~12 serial wait BOUNDARIES per task, not flag
-    count -- the A1 mma-decompose cut 27% of flags for 0% wall): the
-    gemm_v0 template calls are replaced by a hand-written E2-order
-    decomposed sequence (GM->L1, L1->L0A/B, mma, L0C->GM) on INDEPENDENT
-    double-slot L0C accumulators (even head groups -> C_l0c_0, odd ->
-    C_l0c_1; packed [2,*] slots corrupt in the zN fractal layout, the
-    iter9 lesson). The AUTO_SYNC pass keys WAR/RAW flag pairs per
-    buffer, so the two slots' chains interleave in the steady state:
-    mma(g1) overlaps fixpipe(g0) (per-slot FIX_M edges pair mma(t,g)
-    with fixpipe(t-1,g) -- early in task t-1 -- instead of the task
-    tail), and the next task's GM->L1 slab prefetch (MTE2) overlaps the
-    current mma chain. L1 staging is a single full-slab buffer
-    [NG*AM, DK] loaded by ONE workspace copy per relay per section
-    (keeps the AUTO_CV_SYNC cube/vec site counts balanced: 1 ws_a +
-    1 ws_b per section on both sides) and row-sliced per group by the
-    L1->L0A/B copies (dynamic gg slices bit-exact at NG=4, mini probe).
-    L0A/L0B stay single-slot: the fp32 A tile [AM, DK] already fills
-    the 64KB L0A budget at GGRP=4 (doubling L0A is capacity-infeasible;
-    the residual M_MTE1 edge only serializes L1->L0 loads against the
-    previous mma, hidden under the M-pipe chain). The V side is
-    untouched (the AUTO_SYNC pass still owns every V<->MTE2/MTE3 edge;
-    hand-written local flags would collide with the pass's round-robin
-    event IDs 0..7, so none are added on the C side either -- unlike
-     the iter10 A2/A3 manual-flag attempts, which required disabling
-     AUTO_SYNC and left the V side unprotected).
-  9. iter12 V-SIDE WORKLOAD CUT (iter11 attribution: wall = max(V, C)
-     with V = 10.34us/task the sole wall -- beta fold 2.61us + DMA floor
-     ~5-6us + vector chain; the C-side 4.93us chain is fully hidden):
-     - BETA-FOLD VECTORIZATION (five tile ops/head replacing the 64
-       scalar BufferLoad GetValues + tiny Muls per task): beta_f's
-       column h (beta values of head h) is extracted WITHOUT any
-       illegal column-slice path via a one-hot sequence --
-       compare(eq_m, j16b, h) / select(beta_sel, eq_m, beta_f, 0) /
-       reduce_sum(beta_sel -> beta_col, dim=-1) / broadcast(bc_row,
-       beta_col, axis=1) / mul(e, e, bc_row). Bit-identical except the
-       -0.0 corner (x + 0.0 canonicalizes -0.0 beta to +0.0; passes the
-       Akk tolerance gate, iter11 probe analysis). j16b's [SCS,16]
-       compare source is hoisted once per core (loop-invariant).
-     - DRAIN STAGING REFACTOR unlocks the fold's UB budget: the iter1
-       whole-task staging (aqk_s/aqk_h [BH_V,SCS,CS], akk_s/akk_h
-       [BH_V,SCS,AKK_W], 30KB) is replaced by single-head [SCS,*]
-       buffers (7.5KB) refilled per h inside the drain loop -- the
-       planner's ExtendKillIndex forces drain+produce buffers to
-       coexist over the whole task loop, and the 30KB layout left only
-       960B of the 196.352KB UB, less than the fold's 2.3KB scratch
-       (akk_h allocation failure, iter11). Same elementwise ops on the
-       same values per head => bit-identical outputs; cost ~+12 small
-       tile ops/task (per-head fills/casts instead of whole-task ones).
-
-Supported domain (proto_fla_chunk_intra_token_parallel.yaml + iter7):
-fixed-length sequences with S % CS == 0, CS % SCS == 0, H % BH == 0 (BH
-adapts 8 -> 4 -> 2), DK % 16 == 0, DK >= 32, and BH * SCS >= 16 (gemm
-N-fractal lower bound; excludes only SCS < 8 at BH=2 corners not
-exercised by the suite); q/k/beta bfloat16 + gk float32 inputs, bfloat16
-outputs. varlen (cu_seqlens) is out of scope.
+Supported domain: fixed-length sequences, S % CS == 0, CS % SCS == 0,
+CS and SCS powers of two, DK % 16 == 0 and DK >= 32, BH * SCS >= 16;
+BH adapts 8 -> 4 -> 2 under head divisibility plus the exact UB
+coexistence budget (DK=256 drops to BH=2, DK >= 512 rejected). q/k/beta
+bfloat16 + gk float32 in, bfloat16 out; varlen out of scope.
 """
 
 import torch
@@ -189,8 +56,8 @@ LN2 = 0.6931471805599453
 CORE_NUM = 20
 
 # Relay slot ring per core (t % NSLOT). NSLOT=2 is transitively WAR-safe
-# at the 2-task-deferred drain (docstring item 7); bump to 4 only as a
-# diagnostic if a reuse race is ever suspected.
+# at the 2-task-deferred drain (see the pipeline section of the module
+# docstring); bump to 4 only as a diagnostic if a reuse race is suspected.
 NSLOT = 2
 
 # Manual cross-core flag IDs for the o_relay C->V handoff start at 3:
@@ -212,22 +79,44 @@ PASS_CONFIGS = {
 # FULL coexistence budget must fit.
 UB_TOTAL_BYTES = 196_352
 
+_BF16_BYTES = 2
+_F32_BYTES = 4
+_U8_BYTES = 1
+
 
 def _ub_bytes(BH_V, SCS, DK, CS):
-    """UB bytes coexisting in the steady state: bf16/fp32 load staging
-    rows, the fp32 operand accumulators (a_agg + b_agg, the BH_V-
-    proportional part) and the fixed scratches/masks/drain staging
-    (AKK_W = max(SCS, 16))."""
+    """Exact steady-state UB coexistence budget (must fit
+    UB_TOTAL_BYTES). Every term names its buffers -- shapes and dtypes
+    are visible at the alloc sites in the kernel body:
+
+    staging -- per-head load/factorize rows refilled inside the loop
+    accum   -- per-vid fp32 GEMM operand accumulators
+    fixed   -- masks/indices/drain staging alive across the task loop
+    """
     akk_w = max(SCS, 16)
-    staging = 2 * SCS * DK * 2 + 6 * SCS * DK * 4  # q/k rows + 6 fp32 rows
-    accum = 3 * SCS * BH_V * DK * 4  # a_agg (2*SCS*BH_V) + b_agg (SCS*BH_V)
+    staging = (
+        SCS * DK * _BF16_BYTES * 2  # q_h_row + k_h_row (bf16 load rows)
+        + SCS * DK * _F32_BYTES * 6  # q_f_row, k_f_row, g2_row, e, kgj, bc_row
+    )
+    accum = (
+        2 * SCS * BH_V * DK * _F32_BYTES  # a_agg [2*SCS*BH_V, DK]
+        + SCS * BH_V * DK * _F32_BYTES  # b_agg [SCS*BH_V, DK]
+    )
     fixed = (
-        SCS * 16 * (2 + 4 + 1 + 4 + 4) + SCS * 4  # beta_h/f, eq_m, beta_sel, j16b, beta_col
-        + 4 * SCS + 4 * 16  # idx + idx16
-        + 4 * SCS * SCS * 2 + SCS * SCS * 2  # i_grid/j_grid + lt_m/slt_m
-        + 2 * SCS * SCS * 4 + 2 * SCS * SCS * 4  # r_ub + r1_m/a_m
-        + SCS * CS * 4 + SCS * akk_w * 4  # aqk_s + akk_s
-        + SCS * CS * 2 + SCS * akk_w * 2  # aqk_h + akk_h
+        SCS * 16 * _BF16_BYTES  # beta_h
+        + SCS * 16 * _F32_BYTES * 3  # beta_f, beta_sel, j16b
+        + SCS * 16 * _U8_BYTES  # eq_m (one-hot compare mask)
+        + SCS * _F32_BYTES  # beta_col [SCS, 1]
+        + SCS * _F32_BYTES  # idx [SCS]
+        + 16 * _F32_BYTES  # idx16 [16]
+        + 2 * SCS * SCS * _F32_BYTES  # i_grid + j_grid
+        + 2 * SCS * SCS * _U8_BYTES  # lt_m + slt_m
+        + 2 * SCS * SCS * _F32_BYTES  # r_ub [2*SCS, SCS]
+        + 2 * SCS * SCS * _F32_BYTES  # r1_m + a_m
+        + SCS * CS * _F32_BYTES  # aqk_s
+        + SCS * akk_w * _F32_BYTES  # akk_s
+        + SCS * CS * _BF16_BYTES  # aqk_h
+        + SCS * akk_w * _BF16_BYTES  # akk_h
     )
     return staging + accum + fixed
 
@@ -251,21 +140,31 @@ def _pick_ggrp(BH, SCS, DK):
     tiling covers the BH heads exactly, and a non-divisor leaves tail
     heads reading out-of-range gemm groups in o_relay (with inconsistent
     workspace/L1 row counts). Among the divisors of BH, prefer the
-    largest that satisfies the L0A single-K-step budget (fp32 A tile
-    GGRP*2*SCS x DK x 4B <= 64KB) and the L0B/L0C N >= 16 fractal rule
-    (N = GGRP*SCS)."""
+    largest that satisfies gemm_v0's L0A/L0B ping-pong slot budget and
+    the L0B/L0C N >= 16 fractal rule.
+
+    Slot budget (mirrors the static_asserts in gemm_v0): the slots are
+    sized (M x kL0Size) / (nTile x kL0Size) with kL0Size FIXED at 128 --
+    even when K < kL0Size the slot still reserves the full 128 columns --
+    and the per-slot budget halves (64KB -> 32KB) once K needs more than
+    one L0 step. With fp32 operands this bounds M = GGRP*2*SCS to 128
+    elements at DK <= 128 (and 64 above)."""
+    k_l0 = 128
+    steps = (DK + k_l0 - 1) // k_l0
+    slot_elems = (65536 // 4) // (2 if steps > 1 else 1)
     for g in (8, 4, 2, 1):
         if BH % g != 0:
             continue
-        if g * 2 * SCS * DK * 4 > 65536:
+        if g * 2 * SCS * k_l0 > slot_elems:  # A tile: M x kL0Size
             continue
-        if g * SCS < 16:
+        if g * SCS * k_l0 > slot_elems:  # B tile: N x kL0Size
+            continue
+        if g * SCS < 16:  # L0B/L0C N-fractal lower bound
             continue
         return g
     raise ValueError(
-        f"no divisor of BH={BH} satisfies the gemm constraints "
-        f"(L0A budget GGRP*2*SCS*DK*4B <= 64KB and N=GGRP*SCS >= 16) "
-        f"with SCS={SCS}, DK={DK}")
+        f"no divisor of BH={BH} satisfies the gemm constraints (L0A/L0B slot budget at DK={DK} and N=GGRP*SCS >= 16) with SCS={SCS}"
+    )
 
 
 @tilelang.jit(out_idx=[-2, -1], workspace_idx=[4, 5, 6], pass_configs=PASS_CONFIGS)
@@ -337,8 +236,8 @@ def fla_chunk_intra_token_parallel_kernel(
             e = T.alloc_ub([SCS, DK], gate_dtype)  # E-/E+/K'' chain
             kgj = T.alloc_ub([SCS, DK], gate_dtype)  # K' = k * E-
             bc_row = T.alloc_ub([SCS, DK], gate_dtype)  # anchor broadcast
-            # iter11 beta-fold vectorization scratch (one-hot select + row
-            # reduce + column broadcast; replaces 16 scalar muls/head)
+            # beta-fold vectorization scratch (one-hot select + row reduce +
+            # column broadcast; replaces 16 scalar muls/head)
             eq_m = T.alloc_ub([SCS, 16], "uint8")  # (j == h) one-hot mask
             beta_sel = T.alloc_ub([SCS, 16], gate_dtype)
             beta_col = T.alloc_ub([SCS, 1], gate_dtype)
@@ -346,11 +245,11 @@ def fla_chunk_intra_token_parallel_kernel(
             # hoisted idx values; a dedicated produce-live buffer keeps the
             # hoist-only j_grid liveness from extending over the loop)
             j16b = T.alloc_ub([SCS, 16], gate_dtype)
-            # per-vid fp32 operand accumulators (fill-anchored liveness!)
+            # per-vid fp32 operand accumulators (fill-anchored liveness)
             a_agg = T.alloc_ub([AMV, DK], op_dtype)
             b_agg = T.alloc_ub([BNV, DK], op_dtype)
             # masks / index grids (attention_sink pattern); loop-invariant
-            # -> computed ONCE per core (iter8 hoist, was per-task in iter7)
+            # -> computed ONCE per core
             idx = T.alloc_ub([SCS], gate_dtype)
             idx16 = T.alloc_ub([16], gate_dtype)  # beta staging width is fixed 16
             i_grid = T.alloc_ub([SCS, SCS], gate_dtype)
@@ -361,9 +260,9 @@ def fla_chunk_intra_token_parallel_kernel(
             r_ub = T.alloc_ub([2 * SCS, SCS], gate_dtype)
             r1_m = T.alloc_ub([SCS, SCS], gate_dtype)
             a_m = T.alloc_ub([SCS, SCS], gate_dtype)
-            # drain staging, iter12 PER-HEAD REUSE: single-head [SCS, *]
+            # drain staging, PER-HEAD REUSE: single-head [SCS, *]
             # buffers refilled/drained inside the h loop (replaces the
-            # iter1 [BH_V, SCS, *] whole-task layout, 30KB -> 7.5KB; the
+            # [BH_V, SCS, *] whole-task layout, 30KB -> 7.5KB; the
             # planner's ExtendKillIndex makes drain+produce buffers
             # coexist over the whole task loop, and the freed 22.5KB is
             # what unblocks the beta-fold scratch below)
@@ -372,15 +271,11 @@ def fla_chunk_intra_token_parallel_kernel(
             aqk_h = T.alloc_ub([SCS, CS], output_dtype)
             akk_h = T.alloc_ub([SCS, AKK_W], output_dtype)
 
-            # ---- C-side buffers (iter11: full-slab L1 staging + dual
-            # independent L0C slots; L0A/L0B single-slot -- the fp32 A
-            # tile [AM, DK] fills the 64KB L0A budget at GGRP=4) ----
-            A_l1 = T.alloc_L1([NG * AM, DK], op_dtype)
-            B_l1 = T.alloc_L1([NG * BN, DK], op_dtype)
-            l0a = T.alloc_L0A([AM, DK], op_dtype)
-            l0b = T.alloc_L0B([DK, BN], op_dtype)
-            C_l0c_0 = T.alloc_L0C([AM, BN], gate_dtype)  # even head groups
-            C_l0c_1 = T.alloc_L0C([AM, BN], gate_dtype)  # odd head groups
+            # ---- C-side buffers: per-group L1 operand staging + the
+            # single L0C accumulator backing T.gemm_v0 ----
+            A_l1 = T.alloc_L1([AM, DK], op_dtype)
+            B_l1 = T.alloc_L1([BN, DK], op_dtype)
+            C_l0c = T.alloc_L0C([AM, BN], gate_dtype)
 
             # ==== loop-invariant mask hoist (once per core) ====
             T.tile.arith_progression(idx, 0.0, 1.0, SCS)
@@ -388,7 +283,7 @@ def fla_chunk_intra_token_parallel_kernel(
             T.tile.broadcast(i_grid, idx, axis=1)  # i_grid[r, c] = r
             T.tile.compare(lt_m, i_grid, j_grid, "GE")  # r >= c (j <= i)
             T.tile.compare(slt_m, i_grid, j_grid, "GT")  # r > c (j < i)
-            # iter12: the one-hot compare source [SCS,16] (j16b[r, c] = c)
+            # The one-hot compare source [SCS,16] (j16b[r, c] = c)
             # is loop-invariant too -- hoisting its broadcast kills one
             # vector op per task section; the buffer's planner interval
             # is unchanged (ExtendKillIndex already extends it from the
@@ -400,7 +295,7 @@ def fla_chunk_intra_token_parallel_kernel(
             T.tile.broadcast(j16b, idx16, axis=0)
 
             # ==== peeled fill iteration 0: task cid, relay slot 0 ====
-            # task coords (subchunk-major decomposition, same as iter7)
+            # task coords (subchunk-major decomposition)
             sc = cid % NSC
             hg = (cid // NSC) % HG
             bb = cid // (NSC * HG)
@@ -444,10 +339,9 @@ def fla_chunk_intra_token_parallel_kernel(
                 # column broadcast -- bit-identical to the former per-row
                 # scalar muls (select keeps beta_f bits, reduce only adds
                 # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                # (iter11's largest V-side item, 2.6us/task at bench shape)
+                # (the largest V-side item before this change)
                 T.tile.compare(eq_m, j16b, h, "EQ")
-                T.tile.select(beta_sel, eq_m, beta_f, 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.reduce_sum(beta_sel, beta_col, dim=-1)
                 T.tile.broadcast(bc_row, beta_col, axis=1)
                 T.tile.mul(e, e, bc_row)
@@ -458,31 +352,19 @@ def fla_chunk_intra_token_parallel_kernel(
             # per-vid aggregate -> GM relay slot 0 (auto cross-core flags)
             T.copy(a_agg, workspace_a[cid, 0, vid * AMV : vid * AMV + AMV, :])
             T.copy(b_agg, workspace_b[cid, 0, vid * BNV : vid * BNV + BNV, :])
-            # -- C: block-diagonal gemm per head group -> o_relay slot 0
-            # (iter11: ONE full-slab relay load per buffer + decomposed
-            # per-group sequence on double L0C slots, pass-driven flags) --
-            T.copy(workspace_a[cid, 0, :, :], A_l1)
-            T.copy(workspace_b[cid, 0, :, :], B_l1)
-            for g in T.serial((NG + 1) // 2):
-                gg = 2 * g
-                T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                T.mma(l0a, l0b, C_l0c_0, init=True)
-                T.copy(C_l0c_0, o_relay[cid, 0, gg, :, :])
-            if NG >= 2:
-                for g in T.serial(NG // 2):
-                    gg = 2 * g + 1
-                    T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                    T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                    T.mma(l0a, l0b, C_l0c_1, init=True)
-                    T.copy(C_l0c_1, o_relay[cid, 0, gg, :, :])
+            # -- C: block-diagonal gemm per head group -> o_relay slot 0 --
+            for gg in T.serial(NG):
+                T.copy(workspace_a[cid, 0, gg * AM : gg * AM + AM, :], A_l1)
+                T.copy(workspace_b[cid, 0, gg * BN : gg * BN + BN, :], B_l1)
+                T.gemm_v0(A_l1, B_l1, C_l0c, transpose_B=True, init=True)
+                T.copy(C_l0c, o_relay[cid, 0, gg, :, :])
             T.set_cross_flag("FIX", FLAG_BASE)
             # -- V: trailing garbage drain (slot 2 % NSLOT, task cid's
             # region, NO wait): with NSLOT=2 this races C's FIX(0) and
             # writes stale/garbage values that the real drain at t == 2
             # (dt == cid) overwrites bit-identically; keeps the o_relay
             # V-side read-site counts balanced with the C-side writes.
-            # iter12 per-head drain: fill/select/cast/writeback per h on
+            # per-head drain: fill/select/cast/writeback per h on
             # the single-head [SCS, *] buffers (bit-identical: same
             # elementwise ops on the same values; cleared-row zeros
             # re-established by the per-head fill) --
@@ -491,16 +373,12 @@ def fla_chunk_intra_token_parallel_kernel(
                 gh = vid * BH_V + h
                 gg = gh // GGRP
                 wi = gh % GGRP
-                T.copy(o_relay[cid, 2 % NSLOT, gg,
-                               2 * SCS * wi : 2 * SCS * wi + 2 * SCS,
-                               SCS * wi : SCS * wi + SCS], r_ub)
+                T.copy(o_relay[cid, 2 % NSLOT, gg, 2 * SCS * wi : 2 * SCS * wi + 2 * SCS, SCS * wi : SCS * wi + SCS], r_ub)
                 T.tile.fill(aqk_s, 0.0)
                 T.tile.fill(akk_s, 0.0)
-                T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.copy(r1_m, aqk_s[:, w : w + SCS])
-                T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.copy(a_m, akk_s[:, 0:SCS])
                 T.tile.cast(aqk_h, aqk_s, "CAST_RINT", SCS * CS)
                 T.tile.cast(akk_h, akk_s, "CAST_RINT", SCS * AKK_W)
@@ -542,10 +420,9 @@ def fla_chunk_intra_token_parallel_kernel(
                 # column broadcast -- bit-identical to the former per-row
                 # scalar muls (select keeps beta_f bits, reduce only adds
                 # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                # (iter11's largest V-side item, 2.6us/task at bench shape)
+                # (the largest V-side item before this change)
                 T.tile.compare(eq_m, j16b, h, "EQ")
-                T.tile.select(beta_sel, eq_m, beta_f, 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.reduce_sum(beta_sel, beta_col, dim=-1)
                 T.tile.broadcast(bc_row, beta_col, axis=1)
                 T.tile.mul(e, e, bc_row)
@@ -554,41 +431,27 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(kgj, b_agg[SCS * h : SCS * h + SCS, :])
             T.copy(a_agg, workspace_a[cid, 1 % NSLOT, vid * AMV : vid * AMV + AMV, :])
             T.copy(b_agg, workspace_b[cid, 1 % NSLOT, vid * BNV : vid * BNV + BNV, :])
-            # -- C: gemm task pt1 -> o_relay slot 1 (iter11 structure) --
-            T.copy(workspace_a[cid, 1 % NSLOT, :, :], A_l1)
-            T.copy(workspace_b[cid, 1 % NSLOT, :, :], B_l1)
-            for g in T.serial((NG + 1) // 2):
-                gg = 2 * g
-                T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                T.mma(l0a, l0b, C_l0c_0, init=True)
-                T.copy(C_l0c_0, o_relay[cid, 1 % NSLOT, gg, :, :])
-            if NG >= 2:
-                for g in T.serial(NG // 2):
-                    gg = 2 * g + 1
-                    T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                    T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                    T.mma(l0a, l0b, C_l0c_1, init=True)
-                    T.copy(C_l0c_1, o_relay[cid, 1 % NSLOT, gg, :, :])
+            # -- C: gemm task pt1 -> o_relay slot 1 --
+            for gg in T.serial(NG):
+                T.copy(workspace_a[cid, 1 % NSLOT, gg * AM : gg * AM + AM, :], A_l1)
+                T.copy(workspace_b[cid, 1 % NSLOT, gg * BN : gg * BN + BN, :], B_l1)
+                T.gemm_v0(A_l1, B_l1, C_l0c, transpose_B=True, init=True)
+                T.copy(C_l0c, o_relay[cid, 1 % NSLOT, gg, :, :])
             T.set_cross_flag("FIX", FLAG_BASE + 1)
             # -- V: trailing garbage drain (slot 3 % NSLOT, task pt1's
             # region, NO wait; overwritten by the real drain at t == 3);
-            # iter12 per-head drain (see peeled-0 site) --
+            # per-head drain (see the peeled-0 site) --
             w1 = i_s1 * SCS
             for h in T.serial(BH_V):
                 gh = vid * BH_V + h
                 gg = gh // GGRP
                 wi = gh % GGRP
-                T.copy(o_relay[cid, 3 % NSLOT, gg,
-                               2 * SCS * wi : 2 * SCS * wi + 2 * SCS,
-                               SCS * wi : SCS * wi + SCS], r_ub)
+                T.copy(o_relay[cid, 3 % NSLOT, gg, 2 * SCS * wi : 2 * SCS * wi + 2 * SCS, SCS * wi : SCS * wi + SCS], r_ub)
                 T.tile.fill(aqk_s, 0.0)
                 T.tile.fill(akk_s, 0.0)
-                T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.copy(r1_m, aqk_s[:, w1 : w1 + SCS])
-                T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0,
-                              "VSEL_TENSOR_SCALAR_MODE")
+                T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.copy(a_m, akk_s[:, 0:SCS])
                 T.tile.cast(aqk_h, aqk_s, "CAST_RINT", SCS * CS)
                 T.tile.cast(akk_h, akk_s, "CAST_RINT", SCS * AKK_W)
@@ -631,23 +494,19 @@ def fla_chunk_intra_token_parallel_kernel(
                 # argument attributes the wait to the Vector core for the
                 # CombineCV resource verifier) --
                 T.wait_cross_flag(FLAG_BASE + t % 2, "V")
-                # iter12 per-head drain (see peeled-0 site): fill/
+                # per-head drain (see the peeled-0 site): fill/
                 # select/cast/writeback per h on single-head buffers
                 wd = i_sd * SCS
                 for h in T.serial(BH_V):
                     gh = vid * BH_V + h
                     gg = gh // GGRP
                     wi = gh % GGRP
-                    T.copy(o_relay[cid, dslot, gg,
-                                   2 * SCS * wi : 2 * SCS * wi + 2 * SCS,
-                                   SCS * wi : SCS * wi + SCS], r_ub)
+                    T.copy(o_relay[cid, dslot, gg, 2 * SCS * wi : 2 * SCS * wi + 2 * SCS, SCS * wi : SCS * wi + SCS], r_ub)
                     T.tile.fill(aqk_s, 0.0)
                     T.tile.fill(akk_s, 0.0)
-                    T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0,
-                                  "VSEL_TENSOR_SCALAR_MODE")
+                    T.tile.select(r1_m, lt_m, r_ub[0:SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                     T.copy(r1_m, aqk_s[:, wd : wd + SCS])
-                    T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0,
-                                  "VSEL_TENSOR_SCALAR_MODE")
+                    T.tile.select(a_m, slt_m, r_ub[SCS : 2 * SCS, :], 0.0, "VSEL_TENSOR_SCALAR_MODE")
                     T.copy(a_m, akk_s[:, 0:SCS])
                     T.tile.cast(aqk_h, aqk_s, "CAST_RINT", SCS * CS)
                     T.tile.cast(akk_h, akk_s, "CAST_RINT", SCS * AKK_W)
@@ -680,10 +539,9 @@ def fla_chunk_intra_token_parallel_kernel(
                     # column broadcast -- bit-identical to the former per-row
                     # scalar muls (select keeps beta_f bits, reduce only adds
                     # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                    # (iter11's largest V-side item, 2.6us/task at bench shape)
+                    # (the largest V-side item before this change)
                     T.tile.compare(eq_m, j16b, h, "EQ")
-                    T.tile.select(beta_sel, eq_m, beta_f, 0.0,
-                                  "VSEL_TENSOR_SCALAR_MODE")
+                    T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                     T.reduce_sum(beta_sel, beta_col, dim=-1)
                     T.tile.broadcast(bc_row, beta_col, axis=1)
                     T.tile.mul(e, e, bc_row)
@@ -693,25 +551,12 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(a_agg, workspace_a[cid, slot, vid * AMV : vid * AMV + AMV, :])
                 T.copy(b_agg, workspace_b[cid, slot, vid * BNV : vid * BNV + BNV, :])
 
-                # -- C: gemm task pt -> o_relay slot t%NSLOT (iter11:
-                # full-slab load + double-slot decomposed sequence; the
-                # steady state overlaps mma(g1)/fixpipe(g0) and the next
-                # task's slab prefetch) --
-                T.copy(workspace_a[cid, slot, :, :], A_l1)
-                T.copy(workspace_b[cid, slot, :, :], B_l1)
-                for g in T.serial((NG + 1) // 2):
-                    gg = 2 * g
-                    T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                    T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                    T.mma(l0a, l0b, C_l0c_0, init=True)
-                    T.copy(C_l0c_0, o_relay[cid, slot, gg, :, :])
-                if NG >= 2:
-                    for g in T.serial(NG // 2):
-                        gg = 2 * g + 1
-                        T.copy(A_l1[gg * AM : (gg + 1) * AM, :], l0a)
-                        T.copy(B_l1[gg * BN : (gg + 1) * BN, :], l0b, transpose=True)
-                        T.mma(l0a, l0b, C_l0c_1, init=True)
-                        T.copy(C_l0c_1, o_relay[cid, slot, gg, :, :])
+                # -- C: gemm task pt -> o_relay slot t%NSLOT --
+                for gg in T.serial(NG):
+                    T.copy(workspace_a[cid, slot, gg * AM : gg * AM + AM, :], A_l1)
+                    T.copy(workspace_b[cid, slot, gg * BN : gg * BN + BN, :], B_l1)
+                    T.gemm_v0(A_l1, B_l1, C_l0c, transpose_B=True, init=True)
+                    T.copy(C_l0c, o_relay[cid, slot, gg, :, :])
                 T.set_cross_flag("FIX", FLAG_BASE + t % 2)
 
     return main
@@ -731,11 +576,10 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
     if SCS < 1 or CS < SCS:
         raise ValueError(f"invalid chunk/sub_chunk sizes: {CS}/{SCS}")
     if CS & (CS - 1) or SCS & (SCS - 1):
-        # tile alignment: the [SCS, *] staging rows and the [SCS, CS] drain
-        # row must be pow2 (a non-pow2 SCS/CS crashes the TVM compiler
-        # instead of failing cleanly)
-        raise ValueError(
-            f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
+        # tile alignment: the [SCS, *] staging rows and the [SCS, CS]
+        # drain row must be pow2 (non-pow2 chunk sizes crash the TVM
+        # compiler instead of failing cleanly)
+        raise ValueError(f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
     if DK % 16 != 0 or DK < 32:
         raise ValueError(f"DK={DK} must be a multiple of 16 and >= 32")
     if H % 2 != 0:
@@ -745,13 +589,12 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
         raise ValueError(
             f"DK={DK} exceeds the 192KB unified-buffer budget at every "
             f"head-group size (SCS={SCS}: even BH=2 needs "
-            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)")
+            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)"
+        )
     if BH * SCS < 16:
-        # gemm_v0 L0B/L0C N-fractal lower bound with GGRP <= BH (iter7
-        # GEMM-offload restructure; excludes only SCS < 8 at BH=2 corners)
-        raise ValueError(
-            f"BH*SCS={BH * SCS} must be >= 16 (gemm N-fractal lower bound; "
-            f"got BH={BH}, SCS={SCS})")
+        # gemm_v0 L0B/L0C N-fractal lower bound with GGRP <= BH
+        # (excludes only SCS < 8 at BH=2 corners)
+        raise ValueError(f"BH*SCS={BH * SCS} must be >= 16 (gemm N-fractal lower bound; got BH={BH}, SCS={SCS})")
     if q.dtype is not torch.bfloat16 or k.dtype is not torch.bfloat16:
         raise ValueError("q/k must be bfloat16")
     if gk.dtype is not torch.float32:
@@ -764,3 +607,57 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
 
     kernel = fla_chunk_intra_token_parallel_kernel(B, S, H, DK, CS, SCS, BH)
     return kernel(q, k, gk, beta)
+
+
+if __name__ == "__main__":
+    # Smoke entry (the CI legacy runner executes this file with `python`):
+    # minimal fixed-length shape, output-shape/finite checks, "Test Passed!"
+    # on success. Numerical accuracy is covered by
+    # test_example_fla_chunk_intra_token_parallel.py (PyTorch golden).
+    import torch_npu  # noqa: F401  (registers .npu() on torch)
+
+    tilelang.cache.clear_cache()
+    B, S, H, DK, CS, SCS = 1, 64, 8, 64, 64, 16
+
+    gen = torch.Generator().manual_seed(42)
+    q = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
+    k = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
+    beta = torch.randn(B, S, H, generator=gen).to(torch.bfloat16)
+    gk = torch.nn.functional.logsigmoid(torch.randn(B, S, H, DK, generator=gen, dtype=torch.float32))
+    gk = gk.view(B, S // CS, CS, H, DK).cumsum(dim=2).view(B, S, H, DK)
+
+    aqk, akk = fla_chunk_intra_token_parallel(q.npu(), k.npu(), gk.npu(), beta.npu())
+    torch.npu.synchronize()
+    assert aqk.shape == (B, S, H, CS) and aqk.dtype is torch.bfloat16
+    assert akk.shape == (B, S, H, SCS) and akk.dtype is torch.bfloat16
+    for name, out in (("Aqk", aqk), ("Akk", akk)):
+        assert torch.isfinite(out.float()).all().item(), f"{name} contains NaN/Inf"
+    print(f"[SMOKE_PASS] fla_chunk_intra_token_parallel B={B} S={S} H={H} DK={DK} chunk={CS} sub_chunk={SCS} bf16")
+    print("Test Passed!")
+
+
+if __name__ == "__main__":
+    # Smoke entry (the CI legacy runner executes this file with `python`):
+    # minimal fixed-length shape, output-shape/finite checks, "Test Passed!"
+    # on success. Numerical accuracy is covered by
+    # test_example_fla_chunk_intra_token_parallel.py (PyTorch golden).
+    import torch_npu  # noqa: F401  (registers .npu() on torch)
+
+    tilelang.cache.clear_cache()
+    B, S, H, DK, CS, SCS = 1, 64, 8, 64, 64, 16
+
+    gen = torch.Generator().manual_seed(42)
+    q = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
+    k = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
+    beta = torch.randn(B, S, H, generator=gen).to(torch.bfloat16)
+    gk = torch.nn.functional.logsigmoid(torch.randn(B, S, H, DK, generator=gen, dtype=torch.float32))
+    gk = gk.view(B, S // CS, CS, H, DK).cumsum(dim=2).view(B, S, H, DK)
+
+    aqk, akk = fla_chunk_intra_token_parallel(q.npu(), k.npu(), gk.npu(), beta.npu())
+    torch.npu.synchronize()
+    assert aqk.shape == (B, S, H, CS) and aqk.dtype is torch.bfloat16
+    assert akk.shape == (B, S, H, SCS) and akk.dtype is torch.bfloat16
+    for name, out in (("Aqk", aqk), ("Akk", akk)):
+        assert torch.isfinite(out.float()).all().item(), f"{name} contains NaN/Inf"
+    print(f"[SMOKE_PASS] fla_chunk_intra_token_parallel B={B} S={S} H={H} DK={DK} chunk={CS} sub_chunk={SCS} bf16")
+    print("Test Passed!")

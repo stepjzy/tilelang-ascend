@@ -58,3 +58,17 @@
 新增回归：test_example 增 l1_deep_gate（哨兵 0.125）与 l1_dk256_bh2 两用例 + DK=512/
 CS=48 拒绝检查；smoke 入口（d3ca89c6 的 CI legacy runner 需求）并入修复版。全量分层
 26 用例复跑全绿（13 PRECISION + 14 BOUNDARY / 0 FAIL）。
+
+---
+
+## Review 修订记录 II（LLMZhangYC 三条意见，2026-11-10，交付 88e9c5cd）
+
+1. **docstring 压缩**（146 → 44 行）：语义公式 + 架构要点一句话版 + 支持域；完整设计依据在归档材料。
+2. **UB 预算函数重写**：逐缓冲命名项 + dtype 字节常量，每项可对照 kernel 内 alloc 声明审计。
+3. **C 侧改回高层 T.gemm_v0 intrinsic**（替代手写 L1/L0 分解链）：DSL 示范性优先。
+   实测代价 **1762.4us vs 1739.2us（+1.3%，稳态 per-rep 1690-1710）**——此前 +22% 的
+   预期基于旧基线（开发期本地框架）的隔离探针外推，在当前基线（463c234c）实测
+   下 gemm_v0 的 C 侧编排开销已不构成临界路径，被 V 侧墙掩盖，外推被推翻。
+   附带修正 GGRP 槽预算对齐 gemm_v0 模板真实规则（L0A/L0B 槽按 M x 128 固定
+   分配、K>128 槽减半；DK=32 时 GGRP 从 8 回到 4，消除 static_assert 编译拒绝）。
+   精度复验：4 用例 + 2 域拒绝全过（deep-gate 哨兵 0.125 bit 级、DK=256 GGRP=2）。

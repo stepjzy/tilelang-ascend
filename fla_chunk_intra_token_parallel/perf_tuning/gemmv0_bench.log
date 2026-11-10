@@ -1,0 +1,43 @@
+[W1110 19:17:14.011358315 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+[W1110 19:17:25.636972292 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=36, sync_flag_id=0, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=1, sync_flag_id=0, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=77, sync_flag_id=1, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=6, sync_flag_id=1, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 205 ) is not enough to catch up cube loop times (= 410 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=130, sync_flag_id=2, is_write=1, workspace_name=workspace_a, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=11, sync_flag_id=2, is_write=0, workspace_name=workspace_a, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=37, sync_flag_id=3, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=2, sync_flag_id=3, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 1 ) is not enough to catch up cube loop times (= 2 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=78, sync_flag_id=4, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=0, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=7, sync_flag_id=4, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+
+[19:17:26] /mnt/workspace/tilelang-ascend/src/transform/ascend_combinecv.cc:565: Warning: Vec loop times (= 205 ) is not enough to catch up cube loop times (= 410 )
+Vec Sync Point:
+CrossCoreSyncPoint(scope=1, order=131, sync_flag_id=5, is_write=1, workspace_name=workspace_b, pipe=MTE3, target_for_node=None, parent_for_nodes.size()=1, cross_interval=1)
+Cube Sync Point:
+CrossCoreSyncPoint(scope=0, order=12, sync_flag_id=5, is_write=0, workspace_name=workspace_b, pipe=MTE2, target_for_node=None, parent_for_nodes.size()=2, cross_interval=1)
+
+[bench shape=(1,8192,64,128) cs=64 scs=16]
+  events mean = 1762.4 us  (per-rep: ['2323', '1710', '1708', '1690', '1697', '1706', '1698', '1703', '1691', '1699'] us)
+  loop  mean = 1715.8 us  (30 back-to-back launches)
+  unique IO = 621805568 B -> effective bw 353 GB/s = 27.9% of measured ceiling
+  pure-bandwidth floor @ 1263 GB/s = 492 us
