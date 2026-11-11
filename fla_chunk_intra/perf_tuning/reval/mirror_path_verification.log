@@ -1,0 +1,25 @@
+=== SMOKE (new path) ===
+[W1111 21:48:24.411776621 NPUCachingAllocator.cpp:204] Warning: The current CANN and HDK(driver) versions require processing for 32 padding size, with memory allocation. (function operator())
+[SMOKE_PASS] fla_chunk_intra fwd+bwd B=1 S=64 H=2 DK=128 chunk=64 sub_chunk=16
+Test Passed!
+=== DELIVERED TEST (new path, renamed import) ===
+Testing fla_chunk_intra fwd L0 with shape=(1, 64, 2, 128)
+Test pass! Aqk: matched_ratio=1.0000 max_abs=3.815e-06
+Test pass! Akk: matched_ratio=1.0000 max_abs=7.629e-06
+Testing fla_chunk_intra bwd L0 with shape=(1, 64, 2, 128)
+Test pass! dq2: matched_ratio=1.0000 max_abs=3.052e-05
+Test pass! dk2: matched_ratio=1.0000 max_abs=9.155e-05
+Test pass! dg2: matched_ratio=1.0000 max_abs=1.831e-04
+Test pass! db_post: matched_ratio=1.0000 max_abs=9.155e-05
+Test pass! dg_post: matched_ratio=0.9998 max_abs=3.052e-04
+Testing fla_chunk_intra fwd L1 with shape=(1, 8192, 64, 128)
+Test pass! Aqk: matched_ratio=1.0000 max_abs=6.250e-02
+Test pass! Akk: matched_ratio=1.0000 max_abs=1.250e-01
+Testing fla_chunk_intra bwd L1 with shape=(1, 8192, 8, 128)
+Test pass! dq2: matched_ratio=1.0000 max_abs=1.831e-04
+Test pass! dk2: matched_ratio=1.0000 max_abs=3.052e-04
+Test pass! dg2: matched_ratio=1.0000 max_abs=6.104e-04
+Test pass! db_post: matched_ratio=1.0000 max_abs=3.662e-04
+Test pass! dg_post: matched_ratio=0.9999 max_abs=6.409e-04
+Kernel Output Match!
+MOVE_VERIFY_DONE
