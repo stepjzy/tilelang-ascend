@@ -18,9 +18,9 @@
 3. **不在假瓶颈上浪费轮次**：iter2（手动同步 -2.3%）、iter4（reduce 重组三路径否决）、iter10（flag 条数 -27% = wall 0%）都是"技术成功、性能证伪"——先差分剖析/差分探针定位真墙（向量链→V 侧负载→DMA 地板），再押注重组，每轮模型预测必须实测裁决。
 
 ## 交付物
-- 分支 feat/fla-chunk-intra-token-parallel-pr（origin，PR **#1952** open）：f29d3f9f 原始交付 → ecb85906 review 修复（2026-10-30 committer ChaoyangJi 三条意见全采纳：ln2 先减后乘 / UB 容量门 / GGRP 整除，详见 PR_DESCRIPTION.md 修订记录）
+- 分支 feat/fla-chunk-intra-token-parallel-pr（origin，PR **#1952** open，最终 head 3d44a092）：f29d3f9f 原始交付 → 全部 review 修复以单 commit 演进——ChaoyangJi 三条（ln2 先减后乘 / UB 容量 / GGRP 整除）+ LLMZhangYC 三条（docstring 146→44 行 / 魔鬼数字→硬域门 DK≤128 / C 侧改回 T.gemm_v0，实测 +1.3%）+ 镜像路径交付（**examples_experiment/kda/FLA_KDA/** + 源文件基名，无 example_ 前缀；删重复 smoke 块）。详见 PR_DESCRIPTION.md 修订记录 I-IV
 - PR: https://github.com/tile-ai/tilelang-ascend/pull/1952
-- 性能：19150.1 → 1739.2 us（-90.9%，11.0×）@ B=1,S=8192,H=64,DK=128 bf16；review 修复后稳态 ~1698us（+1.5%，深衰减正确性代价）；精度 26 用例全过（ratio 全 1.0000）
+- 性能：19150.1 → 1739.2 us（-90.9%，11.0×）@ B=1,S=8192,H=64,DK=128 bf16；gemm_v0 终版 1762.4us（+1.3%，稳态 ~1700）；精度全过（ratio 全 1.0000，deep-gate 哨兵 0.125 bit 级）
 
 ## 遗留疑问 / 未走通的路
 - relay 结构重构（iter13 路径③）：DMA 与计算重叠量化成立（mte2 2.79us/任务暴露），但双缓冲实施后 Akk 在 t=1 槽位 100% 确定性损坏（Aqk 位精确）——同步 pass 与循环直线化的耦合，需 pass 级修复（region 粒度依赖分析），DSL 层无解。
