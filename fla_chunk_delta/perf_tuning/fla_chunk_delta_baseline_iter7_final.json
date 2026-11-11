@@ -1,0 +1,59 @@
+{
+  "operator": "fla_chunk_delta",
+  "iteration": 7,
+  "timestamp": "2026-11-11T18:40:00+08:00",
+  "phase": "stage3_final",
+  "kernel_time_us": {
+    "fwd_bench": [
+      2520.6,
+      2545.3,
+      2611.9
+    ],
+    "bwd_bench": [
+      4507.8,
+      4552.7,
+      4586.2
+    ],
+    "total_bench": [
+      7028.3,
+      7098.1,
+      7198.2
+    ],
+    "fwd_prep_msprof": 18.1,
+    "bwd_prep_msprof": 22.1,
+    "bwd_main_only_msprof": 4474.4,
+    "note": "op_fwd_main_final 3318.8 is the bench_entry stale BV=64 variant, not the final BV=128 kernel"
+  },
+  "improvement_vs_stage2_baseline": {
+    "fwd": "-62 to -64%",
+    "bwd": "-50 to -51%",
+    "total": "-55.5 to -56.1%"
+  },
+  "target_total_us": 3400,
+  "gap": "~2.1x",
+  "shape": {
+    "B": 1,
+    "S": 8192,
+    "H": 64,
+    "DK": 128,
+    "DV": 128,
+    "chunk_size": 64
+  },
+  "precision": "FINAL --level all --bench: exit 0, Test Passed (L0 6/6, L1 10/10, L2 10/10, Boundary 5/5, no FAIL/WARN lines); max_abs values identical to the Stage-2 record",
+  "adopted_optimizations": [
+    "threads=1 prep kernel (GT/GE/GD tiles, hw transpose + row_expand_sub direct form)",
+    "NSLOT=16 relay ring",
+    "2-chain statement-order batch (bwd kept; fwd superseded by single-chain BV=128)",
+    "relay MTE3 queue ordering (ws1/ws3/ws4 before HBM snapshot writes)",
+    "fwd single-chain + BV=128 (DV%128==0) with row_expand 64-column halves",
+    "bwd qdo/wdv2 shared readback buffer + time-shared L0C accumulator"
+  ],
+  "rejected_optimizations": [
+    "fwd 3-chain batch (+3.6% tail redirect waste)",
+    "bwd BV=128 (L0C 160KB overflow -> nan)",
+    "full-width q~ staging via column-region UB writes (vid corruption)",
+    "q~ externalization to prep (net ~0 by IO/issue accounting)"
+  ],
+  "exhausted": true,
+  "floor_accounting": "fwd ~410x(16x0.10+2x0.7)us, bwd ~819x(27x0.10+3x0.7)us under the current AUTO_SYNC granularity; serial-recurrence round trips are true data dependencies; see fla_chunk_delta_final_summary.md"
+}

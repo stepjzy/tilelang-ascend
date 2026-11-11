@@ -1,0 +1,136 @@
+# proto.yaml — fla_chunk_delta 算子接口规格（KDA gated delta rule chunk 状态递推，fwd + bwd 双 kernel）
+# 迁移来源（已冻结 ref_gpu/，只读）：
+#   - ref_gpu/fla_chunk_delta.py   Triton/FLA 参考实现（语义权威）
+#     ← tile-ai/tilelang@4805777d（main, 2026-11-11 冻结）
+#       examples/kda/FLA_KDA/fla_chunk_delta.py
+#   - ref_gpu/fla_utils.py         上游依赖（exp/exp2/prepare_chunk_indices 语义）
+#     ← tile-ai/tilelang@main examples/kda/FLA_KDA/fla_utils.py
+#   - ref_gpu/test_utils_kda.py    上游 do_bench 计时口径（warmup=20, rep=10, mean）
+#     注：源文件与 FLA_KDA 目录均无测试/bench 入口，测试与 golden 由本次迁移
+#     按 Phase 1 用户裁定自行构造（对齐家族先例 + precision-standard.md 容差）。
+# 范围（Phase 1 用户裁定）：
+#   - 定长序列（IS_VARLEN 分支不实现，对齐家族先例 fla_wy_fast 的范围裁定）；
+#   - USE_G=True + USE_GK=True（g 标量门控 + gk per-channel 门控，性能验收口径）；
+#   - USE_INITIAL_STATE / STORE_FINAL_STATE / SAVE_NEW_VALUE / USE_EXP2 以 constexpr
+#     分支全支持，测试覆盖；benchmark 取默认（无 h0/ht、save_new_value=True、
+#     use_exp2=False）。
+# 编程模式：Developer（用户指定，2026-11-11）。
+# 精度门禁（口径标准 = .agents/skills/tilelang-op-test-design/references/precision-standard.md
+#   混合容差，golden = PyTorch fp64 重写参考实现）：
+#   - fwd 输出 fp16 域（h[B,NT,H,DK,DV] / v_new[B,S,H,DV] / ht fp32）
+#     → 按 fp16 输出档容差；
+#   - bwd 输出 bf16 域（dh[B,NT,H,DK,DV] / dv2[B,S,H,DV]）+ dh0 fp32
+#     → 按 bf16 输出档容差；fp32 档用于 ht/dh0。
+#   - golden = PyTorch fp64 主域 + 上游 cast 语义模拟（每 chunk H→半精度参与 w@H、
+#     v_new→半精度参与 k^T@v_new；h/dh/v_new/dv2 快照按输出 dtype 量化）——
+#     递推中间量 cast 累积误差（~|w@H|·2^-11）远超 fp16 档容差，纯 fp64 golden
+#     对拍必然误判，故 golden 与上游 Triton 数值路径对齐（DESIGN §9.1）。
+#   - 具体阈值 = precision-standard.md §二 按输出 dtype 的混合容差。
+# 性能目标：纯 Kernel 时间 fwd + bwd 合计 < 3400 us；
+#   口径 = do_bench（对齐 ref_gpu/test_utils_kda.py：预热 20 次后重复 10 次
+#   取平均，仅设备侧 kernel 执行时间，不含张量构造/H2D-D2H/JIT/框架开销）：
+#   - fwd benchmark：B=1, S=8192, H=64, DK=128, DV=128, chunk=64，fp16
+#     （k/w/u fp16；g fp32；gk fp32；h/v_new fp16 输出），g+gk 门控启用
+#   - bwd benchmark：B=1, S=8192, H=64, DK=128, DV=128, chunk=64，bf16
+#     （q/k/w/do/dv bf16；g/gk fp32；dh/dv2 bf16 输出），g+gk 门控启用
+#   - 前置条件：精度全部通过（golden = PyTorch 重写参考实现）。
+operator:
+  name: fla_chunk_delta
+  category: Fusion  # C/V 混合：GEMM (Cube) + exp/逐元素乘/掩码 (Vector)，chunk 串行递推
+  formula: |
+    记 chunk 长度 BT=64（S 可整除），NT = S/BT；每 (b, h) 维护状态 H_t ∈ R^{K×V}
+    （fp32，按 64 行 slab 分块适配 K≤256）；n_t = chunk t 末 token 下标；
+    ⊙ 为逐元素乘；exp 按 USE_EXP2 取 exp/exp2（输入 g 在对应底数域）。
+    fwd (chunk_gated_delta_rule_fwd_h，t = 0..NT-1 正向递推)：
+      H_0 = h0（USE_INITIAL_STATE）或 0
+      h[b,t,h,:,:]   = H_t                    # 每 chunk 先存状态（进入 chunk t 时）
+      v_new[t]       = u[t] − w[t] @ H_t      # [BT, DV]（SAVE_NEW_VALUE 时写出）
+      v_new[t]      ⊜= mask_t ⊙ exp(g[n_t] − g[t])          # USE_G，逐 token 标量门控
+      H_t           ⊜= exp(g[n_t])                            # USE_G，整状态衰减
+      H_t[k,:]      ⊜= exp(gk[n_t, k])                        # USE_GK，per-channel 衰减
+      v_new[t]       = v_new[t].to(k.dtype)                   # GEMM 前降精度
+      H_{t+1}        = H_t + k[t]^T @ v_new[t]                # [K, BT]@[BT, DV]
+      ht             = H_NT（STORE_FINAL_STATE，fp32）
+    bwd (chunk_gated_delta_rule_bwd_dhu，t = NT-1..0 反向递推)：
+      dH_NT = dht（USE_FINAL_STATE_GRADIENT）或 0
+      dh[b,t,h,:,:]  = dH_t                   # 每 chunk 先存状态梯度（进入 chunk t 时）
+      dv_part[t]     = (k[t] @ dH_t) ⊙ mask_t ⊙ exp(g[n_t] − g[t])   # USE_G
+      dv2[t]         = dv[t] + dv_part[t]     # [BT, DV] 写出
+      dH_t           ⊜= exp(g[n_t])           # USE_G
+      q̃[t]           = q[t]^T ⊙ exp(g[t])[broadcast, :]      # USE_G（q^T 逐列衰减）
+      dH_t[k,:]      ⊜= exp(gk[n_t, k])       # USE_GK
+      dH_{t-1}       = dH_t + (q̃[t] @ do[t]) * scale − w[t]^T @ dv2[t]
+      dh0            = dH_{-1}（USE_INITIAL_STATE，fp32）
+    注：mask_t = (t·BT + arange(BT)) < T（末 chunk 越界行置 0）；gk 越界通道
+    以 0 填充（exp(0)=1 不衰减）；fwd/bwd 状态存取均发生在 chunk 处理前。
+  attrs:
+    - name: chunk_size
+      type: Int
+      default: 64
+      required: false
+    - name: use_exp2
+      type: Bool
+      default: false   # 上游 wrapper 默认；g 域随之取 log2/ln
+      required: false
+    - name: scale
+      type: Float
+      default: 1.0     # bwd q̃@do 的缩放（上游 benchmark 惯例 K**-0.5）
+      required: false
+    - name: save_new_value
+      type: Bool
+      default: true    # fwd：v_new 是否写出（SAVE_NEW_VALUE constexpr 分支）
+      required: false
+    - name: output_final_state
+      type: Bool
+      default: false   # fwd：ht 是否写出（STORE_FINAL_STATE constexpr 分支）
+      required: false
+  inputs:
+    - name: k     # [B, S, H, DK]
+      dtype: [float16, bfloat16]   # fwd fp16 / bwd bf16（benchmark 口径）
+    - name: w     # [B, S, H, DK]  chunk 内 WY 表示权重（上游已算好）
+      dtype: [float16, bfloat16]
+    - name: u     # [B, S, H, DV]  value（fwd；wrapper 形参名 v）
+      dtype: [float16, bfloat16]
+    - name: g     # [B, S, H] 逐 token 标量 log 衰减（fp32）
+      dtype: [float32]
+    - name: gk    # [B, S, H, DK] 逐 token per-channel log 衰减（fp32）
+      dtype: [float32]
+    - name: h0    # [B, H, DK, DV] 初始状态（可选，fp32）
+      dtype: [float32]
+    - name: q     # [B, S, H, DK]（仅 bwd）
+      dtype: [bfloat16]
+    - name: do    # [B, S, H, DV] 上游梯度（仅 bwd）
+      dtype: [bfloat16]
+    - name: dv    # [B, S, H, DV] 入参部分梯度（仅 bwd）
+      dtype: [bfloat16]
+    - name: dht   # [B, H, DK, DV] 终态梯度（可选，仅 bwd，fp32）
+      dtype: [float32]
+  outputs:
+    - name: h     # [B, NT, H, DK, DV] 每 chunk 状态快照（fwd）
+      dtype: [float16]
+    - name: v_new # [B, S, H, DV]（fwd，SAVE_NEW_VALUE）
+      dtype: [float16]
+    - name: ht    # [B, H, DK, DV] 终态（fwd，fp32，可选）
+      dtype: [float32]
+    - name: dh    # [B, NT, H, DK, DV] 每 chunk 状态梯度快照（bwd）
+      dtype: [bfloat16]
+    - name: dv2   # [B, S, H, DV] 完整 value 梯度（bwd）
+      dtype: [bfloat16]
+    - name: dh0   # [B, H, DK, DV] 初始状态梯度（bwd，fp32，可选：仅 h0 给定时产出）
+      dtype: [float32]
+  schema: >-
+    fla_chunk_delta_fwd(k: Tensor[B,S,H,DK], w: Tensor[B,S,H,DK],
+    u: Tensor[B,S,H,DV], g: Tensor[B,S,H] fp32, gk: Tensor[B,S,H,DK] fp32,
+    initial_state: Optional[Tensor[B,H,DK,DV] fp32] = None,
+    output_final_state: bool = False, chunk_size: int = 64,
+    save_new_value: bool = True, use_exp2: bool = False)
+    -> (h: Tensor[B,NT,H,DK,DV], v_new: Optional[Tensor[B,S,H,DV]],
+    ht: Optional[Tensor[B,H,DK,DV] fp32]);
+    fla_chunk_delta_bwd(q: Tensor[B,S,H,DK], k: Tensor[B,S,H,DK],
+    w: Tensor[B,S,H,DK], do: Tensor[B,S,H,DV], dv: Tensor[B,S,H,DV],
+    g: Tensor[B,S,H] fp32, gk: Tensor[B,S,H,DK] fp32,
+    h0: Optional[Tensor[B,H,DK,DV] fp32] = None,
+    dht: Optional[Tensor[B,H,DK,DV] fp32] = None, scale: float = 1.0,
+    chunk_size: int = 64, use_exp2: bool = False)
+    -> (dh: Tensor[B,NT,H,DK,DV], dh0: Optional[Tensor[B,H,DK,DV] fp32],
+    dv2: Tensor[B,S,H,DV])

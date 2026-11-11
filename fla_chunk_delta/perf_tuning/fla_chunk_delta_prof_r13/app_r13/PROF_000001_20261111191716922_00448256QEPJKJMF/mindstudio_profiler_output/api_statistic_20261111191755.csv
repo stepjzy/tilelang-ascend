@@ -1,0 +1,19 @@
+Device_id,Level,API Name,Time(us),Count,Avg(us),Min(us),Max(us),Variance
+host,acl,aclrtBinaryLoadFromData,453.99,4,113.498,103.15,120.05,42.8
+host,acl,aclrtCreateStreamWithConfig,2060.34,2,1030.17,936.86,1123.48,8706.756
+host,acl,aclrtDestroyStreamForce,2214.76,1,2214.76,2214.76,2214.76,0
+host,acl,aclrtFree,2599.42,6,433.237,4.01,1227.4,215208.902
+host,acl,aclrtFreeHost,622.76,180,3.46,2.14,15.48,2.817
+host,acl,aclrtGetCurrentContext,3.75,1,3.75,3.75,3.75,0
+host,acl,aclrtGetDeviceCount,10.17,2,5.085,5.03,5.14,0.003
+host,acl,aclrtGetFuncBySymbol,169.25,60,2.821,2.08,9.75,2.115
+host,acl,aclrtLaunchKernelWithArgsArray,2045.08,60,34.085,17.12,407.99,3190.27
+host,acl,aclrtMallocHost,881,180,4.894,2.11,16.87,13.431
+host,acl,aclrtMemcpy,64654.05,12,5387.838,174.4,10677.21,9149909.233
+host,acl,aclrtResetDevice,7.25,1,7.25,7.25,7.25,0
+host,acl,aclrtSetDevice,62.17,1,62.17,62.17,62.17,0
+host,acl,aclrtSetOpExecuteTimeOutV2,1214.09,1,1214.09,1214.09,1214.09,0
+host,acl,aclrtSetStreamFailureMode,19.42,2,9.71,5.52,13.9,17.556
+host,acl,aclrtSynchronizeDeviceWithTimeout,63126.29,6,10521.048,21.93,30600.49,119943827.742
+host,acl,aclrtSynchronizeStream,169.46,12,14.122,7.78,20.1,12.596
+host,node,launch,6169.35,60,102.823,77.12,519.49,4495.036

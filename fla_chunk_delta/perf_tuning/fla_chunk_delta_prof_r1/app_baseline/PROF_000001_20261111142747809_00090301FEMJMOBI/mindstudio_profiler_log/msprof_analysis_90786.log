@@ -1,0 +1,1193 @@
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:147] Start C pipeline, prof path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI, flags: 0xb.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:67] Start host CANN trace parsing, path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:53] Start run KernelParserWorker
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:62] Start parse hash data
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:79] Hash data load from path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/data
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:82] success get hash data
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:90] success get hashDbDumper
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.cpp:67] Start create GeHashInfo, sql is CREATE TABLE IF NOT EXISTS GeHashInfo (hash_key TEXT, hash_value TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.cpp:80] create GeHashInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.h:71] Start insert data to GeHashInfo
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.h:84] insert data to GeHashInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [base_dumper.h:62] Dump GeHashInfo data success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:64] Start parse type info data
+2026-11-11 14:28:11 [INFO] [90786] [90786] [kernel_parser_worker.cpp:101] Typeinfo data load from path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/data
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.cpp:67] Start create TypeHashInfo, sql is CREATE TABLE IF NOT EXISTS TypeHashInfo (hash_key TEXT, hash_value TEXT, level TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.cpp:80] create TypeHashInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.h:71] Start insert data to TypeHashInfo
+2026-11-11 14:28:11 [INFO] [90786] [90786] [db_runner.h:84] insert data to TypeHashInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [base_dumper.h:62] Dump TypeHashInfo data success
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:32] HostTraceWorker start
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:32] Group all events start
+2026-11-11 14:28:11 [INFO] [90786] [90787] [time_logger.h:32] Group Kernel start
+2026-11-11 14:28:11 [INFO] [90786] [90796] [time_logger.h:32] Group FusionOpInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90791] [time_logger.h:32] Group NodeBasicInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90790] [time_logger.h:32] Group NodeAttrInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90789] [time_logger.h:32] Group TensorInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90796] [time_logger.h:39] Group FusionOpInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90790] [time_logger.h:39] Group NodeAttrInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90789] [time_logger.h:39] Group TensorInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90791] [time_logger.h:39] Group NodeBasicInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90787] [time_logger.h:39] Group Kernel end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90793] [time_logger.h:32] Group ContextId start
+2026-11-11 14:28:11 [INFO] [90786] [90794] [time_logger.h:32] Group HcclInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90788] [time_logger.h:32] Group TaskTrack start
+2026-11-11 14:28:11 [INFO] [90786] [90793] [time_logger.h:39] Group ContextId end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90792] [time_logger.h:32] Group HcclOpInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90789] [time_logger.h:32] Group CaptureStreamInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90796] [time_logger.h:32] Group CcuAddInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90794] [time_logger.h:39] Group HcclInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90791] [time_logger.h:32] Group DpuTaskTrack start
+2026-11-11 14:28:11 [INFO] [90786] [90795] [time_logger.h:32] Group Mc2CommInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90792] [time_logger.h:39] Group HcclOpInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90787] [time_logger.h:32] Group MemcpyInfo start
+2026-11-11 14:28:11 [INFO] [90786] [90791] [time_logger.h:39] Group DpuTaskTrack end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90790] [time_logger.h:32] Group StreamExpandSpec start
+2026-11-11 14:28:11 [INFO] [90786] [90795] [time_logger.h:39] Group Mc2CommInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90796] [ccu_add_info_parser.cpp:104] Found 0 pending CCU add-info files
+2026-11-11 14:28:11 [INFO] [90786] [90787] [time_logger.h:39] Group MemcpyInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90789] [time_logger.h:39] Group CaptureStreamInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90794] [time_logger.h:32] Group GraphIdMap start
+2026-11-11 14:28:11 [INFO] [90786] [90796] [ccu_add_info_parser.cpp:104] Found 0 pending CCU add-info files
+2026-11-11 14:28:11 [INFO] [90786] [90790] [time_logger.h:39] Group StreamExpandSpec end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90794] [time_logger.h:39] Group GraphIdMap end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90796] [ccu_add_info_parser.cpp:104] Found 0 pending CCU add-info files
+2026-11-11 14:28:11 [INFO] [90786] [90796] [time_logger.h:39] Group CcuAddInfo end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90788] [time_logger.h:39] Group TaskTrack end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90786] [event_grouper.cpp:289] After group events, Kernel: 315, GraphId: 0, FusionOp: 0, NodeBasic: 30, NodeAttr: 0, Tensor: 0, ContextId: 30, HcclInfo: 0, TaskTrack: 35, HcclOpInfo: 0, thread: 90301
+2026-11-11 14:28:11 [INFO] [90786] [90786] [event_grouper.cpp:289] After group events, Kernel: 1, GraphId: 0, FusionOp: 0, NodeBasic: 0, NodeAttr: 0, Tensor: 0, ContextId: 0, HcclInfo: 0, TaskTrack: 0, HcclOpInfo: 0, thread: 90493
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:39] Group all events end, cost time = 3 ms
+2026-11-11 14:28:11 [INFO] [90786] [90799] [time_logger.h:32] Dump dpu task track data start start
+2026-11-11 14:28:11 [INFO] [90786] [90797] [time_logger.h:32] Dump stream expand spec data start start
+2026-11-11 14:28:11 [WARN] [90786] [90799] [base_dumper.h:45] Input data is empty, pass dump
+2026-11-11 14:28:11 [INFO] [90786] [90799] [time_logger.h:39] Dump dpu task track data start end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90802] [host_trace_worker.cpp:194] Start parse host system profile data
+2026-11-11 14:28:11 [INFO] [90786] [90800] [time_logger.h:32] Dump CCU add-info data start start
+2026-11-11 14:28:11 [INFO] [90786] [90805] [time_logger.h:32] Dump model name data start start
+2026-11-11 14:28:11 [INFO] [90786] [90804] [time_logger.h:32] Multi thread build tree start
+2026-11-11 14:28:11 [INFO] [90786] [90798] [time_logger.h:32] Dump flip tasks data start start
+2026-11-11 14:28:11 [WARN] [90786] [90805] [base_dumper.h:45] Input data is empty, pass dump
+2026-11-11 14:28:11 [INFO] [90786] [90800] [time_logger.h:39] Dump CCU add-info data start end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90805] [time_logger.h:39] Dump model name data start end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90802] [host_cpu_freq_parser.cpp:57] No host cpu freq files found under /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/data.
+2026-11-11 14:28:11 [INFO] [90786] [90798] [db_runner.cpp:67] Start create HostTaskFlip, sql is CREATE TABLE IF NOT EXISTS HostTaskFlip (stream_id INTEGER, timestamp NUMERIC, task_id INTEGER, flip_num INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90797] [db_runner.cpp:67] Start create StreamExpandSpec, sql is CREATE TABLE IF NOT EXISTS StreamExpandSpec (expand_status NUMERIC);.
+2026-11-11 14:28:11 [INFO] [90786] [90801] [time_logger.h:32] Dump api data start start
+2026-11-11 14:28:11 [INFO] [90786] [90801] [db_runner.cpp:67] Start create ApiData, sql is CREATE TABLE IF NOT EXISTS ApiData (struct_type TEXT, id TEXT, level TEXT, thread_id INTEGER, item_id TEXT, start INTEGER, end INTEGER, connection_id INTEGER, key INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90807] [host_trace_worker.cpp:213] Start multi thread build tree, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90816] [host_trace_worker.cpp:213] Start multi thread build tree, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90816] [event_queue.cpp:72] EventQueue for thread 90493 is empty
+2026-11-11 14:28:11 [INFO] [90786] [90816] [event_queue.cpp:72] EventQueue for thread 90493 is empty
+2026-11-11 14:28:11 [INFO] [90786] [90807] [event_queue.cpp:72] EventQueue for thread 90301 is empty
+2026-11-11 14:28:11 [INFO] [90786] [90807] [event_queue.cpp:72] EventQueue for thread 90301 is empty
+2026-11-11 14:28:11 [INFO] [90786] [90798] [db_runner.cpp:80] create HostTaskFlip success
+2026-11-11 14:28:11 [WARN] [90786] [90819] [tree_builder.cpp:274] No Events, event type: 8, threadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90817] [tree_builder.cpp:274] No Events, event type: 2, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90797] [db_runner.cpp:80] create StreamExpandSpec success
+2026-11-11 14:28:11 [WARN] [90786] [90818] [tree_builder.cpp:274] No Events, event type: 6, threadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90817] [tree_builder.cpp:274] No Events, event type: 3, threadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90818] [tree_builder.cpp:274] No Events, event type: 5, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90797] [db_runner.h:71] Start insert data to StreamExpandSpec
+2026-11-11 14:28:11 [WARN] [90786] [90817] [tree_builder.cpp:274] No Events, event type: 4, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90798] [db_runner.h:71] Start insert data to HostTaskFlip
+2026-11-11 14:28:11 [WARN] [90786] [90817] [tree_builder.cpp:274] No Events, event type: 6, threadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90817] [tree_builder.cpp:274] No Events, event type: 10, threadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90821] [tree_builder.cpp:274] No Events, event type: 8, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90816] [tree_builder.cpp:361] TaskTrack Events have been processed, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90820] [tree_builder.cpp:324] Add LevelEvents done, threadId = 90301, event type: 2, matchCnt = 30, mismatchCnt = 0 
+2026-11-11 14:28:11 [WARN] [90786] [90822] [tree_builder.cpp:274] No Events, event type: 6, threadId = 90301
+2026-11-11 14:28:11 [WARN] [90786] [90820] [tree_builder.cpp:274] No Events, event type: 3, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90816] [tree_builder.cpp:142] Build Tree End, ThreadId = 90493
+2026-11-11 14:28:11 [WARN] [90786] [90820] [tree_builder.cpp:274] No Events, event type: 4, threadId = 90301
+2026-11-11 14:28:11 [WARN] [90786] [90822] [tree_builder.cpp:274] No Events, event type: 5, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90816] [host_trace_worker.cpp:224] Multi thread build tree done, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90820] [tree_builder.cpp:324] Add LevelEvents done, threadId = 90301, event type: 6, matchCnt = 30, mismatchCnt = 0 
+2026-11-11 14:28:11 [WARN] [90786] [90820] [tree_builder.cpp:274] No Events, event type: 10, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90801] [db_runner.cpp:80] create ApiData success
+2026-11-11 14:28:11 [INFO] [90786] [90797] [db_runner.h:84] insert data to StreamExpandSpec success
+2026-11-11 14:28:11 [INFO] [90786] [90807] [tree_builder.cpp:142] Build Tree End, ThreadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90801] [db_runner.h:71] Start insert data to ApiData
+2026-11-11 14:28:11 [INFO] [90786] [90797] [base_dumper.h:62] Dump StreamExpandSpec data success
+2026-11-11 14:28:11 [INFO] [90786] [90807] [host_trace_worker.cpp:224] Multi thread build tree done, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90797] [time_logger.h:39] Dump stream expand spec data start end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90798] [db_runner.h:84] insert data to HostTaskFlip success
+2026-11-11 14:28:11 [INFO] [90786] [90798] [base_dumper.h:62] Dump HostTaskFlip data success
+2026-11-11 14:28:11 [INFO] [90786] [90798] [time_logger.h:39] Dump flip tasks data start end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90804] [time_logger.h:39] Multi thread build tree end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90804] [time_logger.h:32] Multi thread analyze tree and dump data start
+2026-11-11 14:28:11 [INFO] [90786] [90823] [host_trace_worker.cpp:243] Start analyze tree and dump data, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90832] [host_trace_worker.cpp:243] Start analyze tree and dump data, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90823] [time_logger.h:32] Dump CANN data start
+2026-11-11 14:28:11 [INFO] [90786] [90801] [db_runner.h:84] insert data to ApiData success
+2026-11-11 14:28:11 [INFO] [90786] [90834] [cann_trace_db_dumper.cpp:182] Empty hccl OPs
+2026-11-11 14:28:11 [INFO] [90786] [90836] [cann_trace_db_dumper.cpp:221] Empty host tasks
+2026-11-11 14:28:11 [INFO] [90786] [90834] [cann_trace_db_dumper.cpp:534] Empty hccl tasks
+2026-11-11 14:28:11 [INFO] [90786] [90835] [cann_trace_db_dumper.cpp:260] Empty kernel tasks
+2026-11-11 14:28:11 [INFO] [90786] [90801] [base_dumper.h:62] Dump ApiData data success
+2026-11-11 14:28:11 [INFO] [90786] [90833] [cann_trace_db_dumper.cpp:592] Empty geFusionOps
+2026-11-11 14:28:11 [INFO] [90786] [90832] [time_logger.h:32] Dump CANN data start
+2026-11-11 14:28:11 [INFO] [90786] [90801] [time_logger.h:39] Dump api data start end, cost time = 2 ms
+2026-11-11 14:28:11 [INFO] [90786] [90823] [time_logger.h:39] Dump CANN data end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90823] [host_trace_worker.cpp:252] Dump cann trace data done, threadId = 90493
+2026-11-11 14:28:11 [INFO] [90786] [90837] [cann_trace_db_dumper.cpp:182] Empty hccl OPs
+2026-11-11 14:28:11 [INFO] [90786] [90837] [cann_trace_db_dumper.cpp:534] Empty hccl tasks
+2026-11-11 14:28:11 [INFO] [90786] [90838] [time_logger.h:32] Dump host tasks start
+2026-11-11 14:28:11 [INFO] [90786] [90838] [db_runner.cpp:67] Start create HostTask, sql is CREATE TABLE IF NOT EXISTS HostTask (model_id INTEGER, request_id INTEGER, stream_id INTEGER, task_id INTEGER, context_ids TEXT, batch_id INTEGER, task_type TEXT, kernel_name TEXT, device_id INTEGER, timestamp NUMERIC, connection_id INTEGER, thread_id NUMERIC);.
+2026-11-11 14:28:11 [INFO] [90786] [90840] [time_logger.h:32] DumpOpDesc Start start
+2026-11-11 14:28:11 [INFO] [90786] [90837] [cann_trace_db_dumper.cpp:592] Empty geFusionOps
+2026-11-11 14:28:11 [WARN] [90786] [90840] [cann_trace_db_dumper.cpp:342] Can't get task's kernel name, streamId is 48, taskId is 3, batch id is 0, timestamp is 75707804604938.
+2026-11-11 14:28:11 [WARN] [90786] [90840] [cann_trace_db_dumper.cpp:342] Can't get task's kernel name, streamId is 48, taskId is 4, batch id is 0, timestamp is 75707804629950.
+2026-11-11 14:28:11 [INFO] [90786] [90840] [db_runner.cpp:67] Start create TaskInfo, sql is CREATE TABLE IF NOT EXISTS TaskInfo (model_id INTEGER, op_name TEXT, stream_id INTEGER, task_id INTEGER, block_num INTEGER, mix_block_num INTEGER, op_state TEXT, task_type TEXT, op_type TEXT, index_id INTEGER, thread_id INTEGER, timestamp NUMERIC, batch_id INTEGER, tensor_num INTEGER, input_formats TEXT, input_data_types TEXT, input_shapes TEXT, output_formats TEXT, output_data_types TEXT, output_shapes TEXT, device_id INTEGER, context_id INTEGER, op_flag TEXT, hashid TEXT, grid_dim TEXT, block_dim TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90838] [db_runner.cpp:80] create HostTask success
+2026-11-11 14:28:11 [INFO] [90786] [90838] [db_runner.h:71] Start insert data to HostTask
+2026-11-11 14:28:11 [INFO] [90786] [90840] [db_runner.cpp:80] create TaskInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90840] [db_runner.h:71] Start insert data to TaskInfo
+2026-11-11 14:28:11 [INFO] [90786] [90838] [db_runner.h:84] insert data to HostTask success
+2026-11-11 14:28:11 [INFO] [90786] [90838] [time_logger.h:39] Dump host tasks end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90840] [db_runner.h:84] insert data to TaskInfo success
+2026-11-11 14:28:11 [INFO] [90786] [90840] [time_logger.h:39] DumpOpDesc Start end, cost time = 1 ms
+2026-11-11 14:28:11 [INFO] [90786] [90832] [time_logger.h:39] Dump CANN data end, cost time = 2 ms
+2026-11-11 14:28:11 [INFO] [90786] [90832] [host_trace_worker.cpp:252] Dump cann trace data done, threadId = 90301
+2026-11-11 14:28:11 [INFO] [90786] [90804] [time_logger.h:39] Multi thread analyze tree and dump data end, cost time = 3 ms
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:32] Dump memcpy info data start start
+2026-11-11 14:28:11 [WARN] [90786] [90786] [base_dumper.h:45] Input data is empty, pass dump
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:39] Dump memcpy info data start end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:39] HostTraceWorker end, cost time = 9 ms
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:70] Host CANN trace parsing finished, path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host, ret: 0.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:82] Start device data parsing, path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:32] DeviceContextEntry  start
+2026-11-11 14:28:11 [INFO] [90786] [90842] [process_control.cpp:331] Level[0]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90845] [parser.cpp:138] notify: no files pattern, don't need to parse
+2026-11-11 14:28:11 [INFO] [90786] [90843] [parser.cpp:63] loop: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/data/lpmInfoConv.data.0.slice_0, file size: 8880
+2026-11-11 14:28:11 [INFO] [90786] [90845] [freq_parser.cpp:69] FreqProfileData structCount is : 0
+2026-11-11 14:28:11 [INFO] [90786] [90845] [freq_parser.cpp:131] Freq.data parser is completed, begin to save data into dataInventory!
+2026-11-11 14:28:11 [INFO] [90786] [90845] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90843] [parser.cpp:66] total size: 8880
+2026-11-11 14:28:11 [INFO] [90786] [90843] [parser.cpp:181] Parse filePrefix is: lpmFreqConv.,lpmInfoConv., the number of files is: 1, and the total size of all files is: 8880
+2026-11-11 14:28:11 [INFO] [90786] [90845] [process_control.cpp:331] Level[1]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90843] [parser.cpp:103] Data has been read to the memory successfully!
+2026-11-11 14:28:11 [INFO] [90786] [90843] [lpm_info_parser.cpp:97] LpmInfo structCount is: 10
+2026-11-11 14:28:11 [INFO] [90786] [90846] [freq_persistence.cpp:55] The freq is default data no need to persistence!
+2026-11-11 14:28:11 [INFO] [90786] [90846] [process_control.cpp:331] Level[2]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90843] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90843] [process_control.cpp:331] Level[3]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90847] [persistence_utils.h:46] Processor Save FreqParse Data.
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.cpp:67] Start create FreqParse, sql is CREATE TABLE IF NOT EXISTS FreqParse (syscnt INTEGER, freq INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:104] Query data success: SELECT expand_status from StreamExpandSpec LIMIT 1
+2026-11-11 14:28:11 [INFO] [90786] [90844] [process_control.cpp:331] Level[4]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90849] [parser.cpp:138] notify: no files pattern, don't need to parse
+2026-11-11 14:28:11 [INFO] [90786] [90849] [aicpu_parser.cpp:82] aicpu structCount: 0
+2026-11-11 14:28:11 [INFO] [90786] [90849] [aicpu_parser.cpp:104] AicpuParser inject streamIdMap, size=0.
+2026-11-11 14:28:11 [INFO] [90786] [90850] [parser.cpp:63] loop: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/data/ts_track.data.0.slice_0, file size: 40
+2026-11-11 14:28:11 [INFO] [90786] [90849] [aicpu_parser.cpp:109] AicpuParser inject aicpuData, count=0.
+2026-11-11 14:28:11 [INFO] [90786] [90850] [parser.cpp:66] total size: 40
+2026-11-11 14:28:11 [INFO] [90786] [90848] [parser.cpp:63] loop: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/data/ffts_profile.data.0.slice_0, file size: 157440
+2026-11-11 14:28:11 [INFO] [90786] [90850] [parser.cpp:181] Parse filePrefix is: ts_track., the number of files is: 1, and the total size of all files is: 40
+2026-11-11 14:28:11 [INFO] [90786] [90849] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90851] [parser.cpp:63] loop: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/data/stars_soc.data.0.slice_0, file size: 8320
+2026-11-11 14:28:11 [INFO] [90786] [90850] [parser.cpp:103] Data has been read to the memory successfully!
+2026-11-11 14:28:11 [INFO] [90786] [90851] [parser.cpp:66] total size: 8320
+2026-11-11 14:28:11 [INFO] [90786] [90848] [parser.cpp:66] total size: 157440
+2026-11-11 14:28:11 [INFO] [90786] [90849] [process_control.cpp:331] Level[5]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90851] [parser.cpp:181] Parse filePrefix is: stars_soc., the number of files is: 1, and the total size of all files is: 8320
+2026-11-11 14:28:11 [INFO] [90786] [90850] [ts_track_parser.cpp:87] TsTrack structCount: 1
+2026-11-11 14:28:11 [INFO] [90786] [90848] [parser.cpp:181] Parse filePrefix is: ffts_profile, the number of files is: 1, and the total size of all files is: 157440
+2026-11-11 14:28:11 [INFO] [90786] [90850] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90851] [parser.cpp:103] Data has been read to the memory successfully!
+2026-11-11 14:28:11 [INFO] [90786] [90851] [stars_soc_parser.cpp:95] StarsSoc structCount: 130
+2026-11-11 14:28:11 [INFO] [90786] [90850] [process_control.cpp:331] Level[6]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90850] [step_trace_process.cpp:228] Start to process step trace data
+2026-11-11 14:28:11 [WARN] [90786] [90850] [step_trace_process.cpp:241] stepData is empty
+2026-11-11 14:28:11 [INFO] [90786] [90848] [parser.cpp:103] Data has been read to the memory successfully!
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.cpp:80] create FreqParse success
+2026-11-11 14:28:11 [INFO] [90786] [90850] [process_control.cpp:331] Level[7]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90848] [ffts_profile_parser.cpp:90] FftsProfileData structCount is : 1230
+2026-11-11 14:28:11 [INFO] [90786] [90845] [persistence_utils.h:46] Processor Save DeviceTaskFlip Data.
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.h:71] Start insert data to FreqParse
+2026-11-11 14:28:11 [INFO] [90786] [90845] [db_runner.cpp:67] Start create DeviceTaskFlip, sql is CREATE TABLE IF NOT EXISTS DeviceTaskFlip (stream_id INTEGER, timestamp NUMERIC, task_id INTEGER, flip_num INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90850] [trace_persistence.cpp:360] Start to process /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/trace.db.
+2026-11-11 14:28:11 [INFO] [90786] [90846] [step_trace_persistence.cpp:111] Start to process /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/step_trace.db.
+2026-11-11 14:28:11 [WARN] [90786] [90850] [trace_persistence.cpp:246] StepTraceTasks is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90846] [step_trace_persistence.cpp:65] StepTraceTasks is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90850] [trace_persistence.cpp:288] StepTraceTasks is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90850] [trace_persistence.cpp:214] StepTime data is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90846] [step_trace_persistence.cpp:92] StepTime data is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90850] [trace_persistence.cpp:335] TrainingTrace data is empty.
+2026-11-11 14:28:11 [INFO] [90786] [90850] [db_runner.cpp:67] Start create training_trace, sql is CREATE TABLE IF NOT EXISTS training_trace (device_id INTEGER, model_id INTEGER, iteration_id INTEGER, FP_start INTEGER, BP_end INTEGER, iteration_end INTEGER, iteration_time INTEGER, fp_bp_time INTEGER, grad_refresh_bound INTEGER, data_aug_bound INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90846] [process_control.cpp:331] Level[8]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.h:84] insert data to FreqParse success
+2026-11-11 14:28:11 [INFO] [90786] [90851] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90851] [process_control.cpp:331] Level[9]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90847] [persistence_utils.h:46] Processor Save AicVoltage Data.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [time_logger.h:32] LogModeling::SplitLogGroups  start
+2026-11-11 14:28:11 [INFO] [90786] [90849] [acc_pmu_persistence.cpp:66] Start to process /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/acc_pmu.db.
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.cpp:67] Start create AicVoltage, sql is CREATE TABLE IF NOT EXISTS AicVoltage (syscnt INTEGER, voltage INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [acc_pmu_persistence.cpp:71] There is no acc pmu data don't need to persistence!
+2026-11-11 14:28:11 [INFO] [90786] [90844] [time_logger.h:39] LogModeling::SplitLogGroups  end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:168] HalLogData size:130
+2026-11-11 14:28:11 [INFO] [90786] [90849] [process_control.cpp:331] Level[10]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:169] acsqS stream:2, total:35
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:170] acsqE stream:2, total:35
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:171] fftsS stream:1, total:30
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:172] fftsE stream:1, total:30
+2026-11-11 14:28:11 [INFO] [90786] [90844] [time_logger.h:32] LogModeling::AddToDeviceTask  start
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:251] ACSQ matched count:35
+2026-11-11 14:28:11 [INFO] [90786] [90844] [log_modeling.cpp:262] FFTS matched count:30
+2026-11-11 14:28:11 [INFO] [90786] [90844] [time_logger.h:39] LogModeling::AddToDeviceTask  end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90845] [db_runner.cpp:80] create DeviceTaskFlip success
+2026-11-11 14:28:11 [INFO] [90786] [90844] [process_control.cpp:331] Level[11]Release Data Types: St6vectorIN8Analysis6Domain10HalLogDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90850] [db_runner.cpp:80] create training_trace success
+2026-11-11 14:28:11 [INFO] [90786] [90845] [db_runner.h:71] Start insert data to DeviceTaskFlip
+2026-11-11 14:28:11 [INFO] [90786] [90850] [process_control.cpp:331] Level[12]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.cpp:80] create AicVoltage success
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.h:71] Start insert data to AicVoltage
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90845] [db_runner.h:84] insert data to DeviceTaskFlip success
+2026-11-11 14:28:11 [INFO] [90786] [90845] [ts_track_persistence.cpp:147] Process 0 done!, type is 1, status is 
+2026-11-11 14:28:11 [INFO] [90786] [90845] [ts_track_persistence.cpp:175] Save tsTrack data success, size is 1
+2026-11-11 14:28:11 [INFO] [90786] [90845] [process_control.cpp:331] Level[13]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90847] [db_runner.h:84] insert data to AicVoltage success
+2026-11-11 14:28:11 [INFO] [90786] [90847] [process_control.cpp:331] Level[14]Release Data Types: N8Analysis6Domain14HalLpmInfoDataE 
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:104] Query data success: SELECT stream_id, request_id, batch_id, task_id, context_ids, model_id, task_type, kernel_name, connection_id, device_id FROM HostTask WHERE device_id IN (0)
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:104] Query data success: SELECT stream_id, batch_id, task_id, context_id, block_num, mix_block_num FROM TaskInfo where device_id = 0
+2026-11-11 14:28:11 [INFO] [90786] [90844] [load_host_data.cpp:145] Read host GE info 0 not in table.
+2026-11-11 14:28:11 [WARN] [90786] [90844] [load_host_data.cpp:65] There is no /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/../host/sqlite/hccl.db
+2026-11-11 14:28:11 [WARN] [90786] [90844] [load_host_data.cpp:65] There is no /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/../host/sqlite/hccl.db
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:104] Query data success: SELECT hash_key, hash_value FROM GeHashInfo
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90844] [db_runner.h:104] Query data success: SELECT stream_id, batch_id, task_id, context_id, op_name FROM TaskInfo WHERE device_id = 0 AND op_name LIKE '%AicpuKernel%'
+2026-11-11 14:28:11 [WARN] [90786] [90844] [load_host_data.cpp:65] There is no /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/../host/sqlite/mc2_comm_info.db
+2026-11-11 14:28:11 [INFO] [90786] [90844] [process_control.cpp:331] Level[15]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90843] [aicpu_persistence.cpp:748] Start to process aicpu data for device, path /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [ascend_task_association.cpp:178] Found 65 host device matched task, generate 65 topDownTask
+2026-11-11 14:28:11 [INFO] [90786] [90844] [process_control.cpp:331] Level[16]Release Data Types: St3mapIN8Analysis6Domain6TaskIdESt6vectorINS1_8HostTaskESaIS4_EESt4lessIS2_ESaISt4pairIKS2_S6_EEE 
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:55] Start Hccl calculator ProcessEntry.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:89] Start Hccl calculator GetHcclData.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:122] Start merge hccl task and ascend task.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:164] There are 0 records before HcclTask data filtering, filterTime is 7.56291e+14.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:170] There are 0 records after HcclTask data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:346] Start merge hccl op data.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:415] Start UpdateHcclOpNameByGroupName.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:421] Start UpdateHcclBandwidth.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:519] Start GetHcclStatisticsData.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [hccl_calculator.cpp:530] Start inject hccl data.
+2026-11-11 14:28:11 [INFO] [90786] [90844] [process_control.cpp:331] Level[17]Release Data Types: St6vectorIN8Analysis6Domain8HcclTaskESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90849] [ascend_task_persistence.cpp:87] Start to process /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/ascend_task.db.
+2026-11-11 14:28:11 [INFO] [90786] [90843] [process_control.cpp:331] Level[18]Release Data Types: N8Analysis6Domain16DeviceStreamInfoE St13unordered_mapISsSsSt4hashISsESt8equal_toISsESaISt4pairIKSsSsEEE St6vectorIN8Analysis6Domain9AicpuDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90849] [persistence_utils.h:46] Processor Save AscendTask Data.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [db_runner.cpp:67] Start create AscendTask, sql is CREATE TABLE IF NOT EXISTS AscendTask (model_id INTEGER, index_id INTEGER, stream_id INTEGER, task_id INTEGER, context_id INTEGER, batch_id INTEGER, start_time NUMERIC, duration NUMERIC, host_task_type TEXT, device_task_type TEXT, connection_id INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [db_runner.cpp:80] create AscendTask success
+2026-11-11 14:28:11 [INFO] [90786] [90849] [db_runner.h:71] Start insert data to AscendTask
+2026-11-11 14:28:11 [INFO] [90786] [90848] [ffts_profile_parser.cpp:107] Ffts_profile.data parser is completed, begin to save data into dataInventory!
+2026-11-11 14:28:11 [INFO] [90786] [90848] [parser.cpp:202] Parser is completed!
+2026-11-11 14:28:11 [INFO] [90786] [90848] [process_control.cpp:331] Level[19]Release Data Types: N8Analysis6Domain16StreamExpandSpecE 
+2026-11-11 14:28:11 [INFO] [90786] [90842] [pmu_modeling.cpp:60] PMU modeling has done!
+2026-11-11 14:28:11 [INFO] [90786] [90842] [process_control.cpp:331] Level[20]Release Data Types: St6vectorIN8Analysis6Domain12HalTrackDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90850] [pmu_association.cpp:51] context pmu count is : 30
+2026-11-11 14:28:11 [INFO] [90786] [90850] [pmu_association.cpp:52] block pmu count is : 1200
+2026-11-11 14:28:11 [INFO] [90786] [90850] [pmu_association.cpp:459] The acceleratorType of PMU is MIX
+2026-11-11 14:28:11 [INFO] [90786] [90849] [db_runner.h:84] insert data to AscendTask success
+2026-11-11 14:28:11 [INFO] [90786] [90849] [ascend_task_persistence.cpp:98] Process AscendTask done!
+2026-11-11 14:28:11 [INFO] [90786] [90849] [process_control.cpp:331] Level[21]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90849] [kfc_calculator.cpp:62] Start Kfc calculator ProcessEntry.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [hccl_calculator.h:160] There are 0 records before kfc master stream data filtering, filterTime is 7.56291e+14.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [hccl_calculator.h:164] There are 0 records after kfc master stream data filtering.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [kfc_calculator.cpp:76] Failed to build kfc upstream data, skip kfc calculation.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [process_control.cpp:331] Level[22]Release Data Types: St3mapIN8Analysis6Domain6TaskIdESsSt4lessIS2_ESaISt4pairIKS2_SsEEE St6vectorI11TopDownTaskSaIS0_EE St6vectorIN8Analysis6Domain11KfcInfoDataESaIS2_EE St6vectorIN8Analysis6Domain11Mc2CommInfoESaIS2_EE St6vectorIN8Analysis6Domain20MasterStreamTaskDataESaIS2_EE St6vectorIN8Analysis6Domain6HcclOpESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90849] [device_hccl_persistence.cpp:252] Start to dump device hccl data.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:74] Hccl op data is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:107] Hccl task data is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:142] Hccl statistics data is empty.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:169] No kfc task data, skip saving kfc task data.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:200] No kfc op data, skip saving kfc op data.
+2026-11-11 14:28:11 [WARN] [90786] [90849] [device_hccl_persistence.cpp:229] No kfc op report data, skip saving kfc op report data.
+2026-11-11 14:28:11 [INFO] [90786] [90849] [process_control.cpp:331] Level[23]Release Data Types: St6vectorIN8Analysis6Domain12DeviceHcclOpESaIS2_EE St6vectorIN8Analysis6Domain14DeviceHcclTaskESaIS2_EE St6vectorIN8Analysis6Domain14HcclStatisticsESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90850] [pmu_association.cpp:357] Context PMU has been calculated!
+2026-11-11 14:28:11 [INFO] [90786] [90850] [process_control.cpp:331] Level[24]Release Data Types: St6vectorIN8Analysis6Domain14HalFreqLpmDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90846] [metric_summary_persistence.cpp:394] Start to process /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db.
+2026-11-11 14:28:11 [INFO] [90786] [90846] [db_runner.cpp:67] Start create MetricSummary, sql is CREATE TABLE IF NOT EXISTS MetricSummary (task_id INTEGER, stream_id INTEGER, subtask_id INTEGER, batch_id INTEGER, aic_total_time NUMERIC, aic_total_cycles NUMERIC, aic_mac_time NUMERIC, aic_mac_ratio_extra NUMERIC, aic_scalar_time NUMERIC, aic_scalar_ratio NUMERIC, aic_mte1_time NUMERIC, aic_mte1_ratio_extra NUMERIC, aic_mte2_time NUMERIC, aic_mte2_ratio NUMERIC, aic_fixpipe_time NUMERIC, aic_fixpipe_ratio NUMERIC, aic_icache_miss_rate NUMERIC, aiv_total_time NUMERIC, aiv_total_cycles NUMERIC, aiv_vec_time NUMERIC, aiv_vec_ratio NUMERIC, aiv_mac_time NUMERIC, aiv_mac_ratio NUMERIC, aiv_scalar_time NUMERIC, aiv_scalar_ratio NUMERIC, aiv_mte1_time NUMERIC, aiv_mte1_ratio NUMERIC, aiv_mte2_time NUMERIC, aiv_mte2_ratio NUMERIC, aiv_mte3_time NUMERIC, aiv_mte3_ratio NUMERIC, aiv_icache_miss_rate NUMERIC, end_time INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90846] [db_runner.cpp:80] create MetricSummary success
+2026-11-11 14:28:11 [INFO] [90786] [90846] [metric_summary_persistence.cpp:404] Process MetricSummary done!
+2026-11-11 14:28:11 [INFO] [90786] [90846] [process_control.cpp:331] Level[25]Release Data Types: N8Analysis6Domain14HostStreamInfoE St3mapIN8Analysis6Domain6TaskIdESt6vectorINS1_10DeviceTaskESaIS4_EESt4lessIS2_ESaISt4pairIKS2_S6_EEE St6vectorIN8Analysis6Domain10HalPmuDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90786] [device_context.cpp:169] stat info: ===============================================================================
+deivce file in /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0
+chip id: 5, process levels:9
+-------------------------------------------------------------------------------
+level[0] generalResult:true, process num:4
+	process0[DeviceTaskProcess]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:756328667017 us, duration: 11 us
+	process1[FreqParser]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:756328666995 us, duration: 139 us
+	process2[LpmInfoParser]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:756328666960 us, duration: 356 us
+	process3[LoadStreamExpandSpec]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:756328667011 us, duration: 494 us
+-------------------------------------------------------------------------------
+level[1] generalResult:true, process num:6
+	process0[FreqPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: FreqParser, 
+		startTime:756328667211 us, duration: 34 us
+	process1[AicpuParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:756328667603 us, duration: 148 us
+	process2[TsTrackParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:756328667597 us, duration: 219 us
+	process3[StarsSocParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:756328667654 us, duration: 745 us
+	process4[LpmInfoPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: LpmInfoParser, 
+		startTime:756328667375 us, duration: 2074 us
+	process5[FftsProfileParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:756328667607 us, duration: 5074 us
+-------------------------------------------------------------------------------
+level[2] generalResult:true, process num:5
+	process0[StepTraceProcess]:return: 0x0, mandatory:false
+		dependProcessNames: TsTrackParser, 
+		startTime:756328667883 us, duration: 38 us
+	process1[AccPmuPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: StarsSocParser, 
+		startTime:756328668474 us, duration: 52 us
+	process2[Domain::LogModeling]:return: 0x0, mandatory:true
+		dependProcessNames: StarsSocParser, TsTrackParser, 
+		startTime:756328668466 us, duration: 218 us
+	process3[TsTrackPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: TsTrackParser, 
+		startTime:756328667886 us, duration: 1478 us
+	process4[PmuModeling]:return: 0x0, mandatory:true
+		dependProcessNames: FftsProfileParser, TsTrackParser, 
+		startTime:756328672742 us, duration: 131 us
+-------------------------------------------------------------------------------
+level[3] generalResult:true, process num:3
+	process0[StepTracePersistence]:return: 0x0, mandatory:true
+		dependProcessNames: StepTraceProcess, TsTrackParser, 
+		startTime:756328667993 us, duration: 130 us
+	process1[TracePersistence]:return: 0x0, mandatory:true
+		dependProcessNames: StepTraceProcess, TsTrackParser, 
+		startTime:756328667999 us, duration: 859 us
+	process2[LoadHostData]:return: 0x0, mandatory:false
+		dependProcessNames: Domain::LogModeling, 
+		startTime:756328668731 us, duration: 2250 us
+-------------------------------------------------------------------------------
+level[4] generalResult:true, process num:2
+	process0[AscendTaskAssociation]:return: 0x0, mandatory:true
+		dependProcessNames: LoadHostData, 
+		startTime:756328671048 us, duration: 598 us
+	process1[AicpuPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: AicpuParser, LoadHostData, TsTrackParser, 
+		startTime:756328671057 us, duration: 822 us
+-------------------------------------------------------------------------------
+level[5] generalResult:true, process num:2
+	process0[HcclCalculator]:return: 0x0, mandatory:true
+		dependProcessNames: AscendTaskAssociation, LoadHostData, 
+		startTime:756328671701 us, duration: 152 us
+	process1[PmuAssociation]:return: 0x0, mandatory:true
+		dependProcessNames: LoadHostData, AscendTaskAssociation, PmuModeling, 
+		startTime:756328672928 us, duration: 614 us
+-------------------------------------------------------------------------------
+level[6] generalResult:true, process num:2
+	process0[AscendTaskPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: HcclCalculator, 
+		startTime:756328671910 us, duration: 1176 us
+	process1[MetricSummaryPersistence]:return: 0x0, mandatory:false
+		dependProcessNames: PmuAssociation, 
+		startTime:756328673584 us, duration: 1212 us
+-------------------------------------------------------------------------------
+level[7] generalResult:true, process num:1
+	process0[KfcCalculator]:return: 0x0, mandatory:true
+		dependProcessNames: AicpuPersistence, AscendTaskPersistence, 
+		startTime:756328673148 us, duration: 52 us
+-------------------------------------------------------------------------------
+level[8] generalResult:true, process num:1
+	process0[DeviceHcclPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: HcclCalculator, KfcCalculator, 
+		startTime:756328673272 us, duration: 50 us
+
+
+2026-11-11 14:28:11 [INFO] [90786] [90786] [time_logger.h:39] DeviceContextEntry  end, cost time = 9 ms
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:84] Device data parsing finished, path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:199] Start timeline export, prof path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI, export DB: true.
+2026-11-11 14:28:11 [INFO] [90786] [90786] [export_manager.cpp:131] Start to load data!
+2026-11-11 14:28:11 [INFO] [90786] [90786] [export_manager.cpp:234] The report parameter is not used.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] DEVICE_MSTX Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [data_processor.cpp:37] UNIFIED_PMU Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.cpp:37] BLOCK_DETAIL Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] QOS Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.cpp:37] LLC Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.cpp:37] LOW_POWER Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.cpp:37] HCCS Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90860] [data_processor.cpp:37] AICORE_FREQ Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.cpp:37] BIU_PERF Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90861] [low_power_processor.cpp:35] This platformVersion: 5 does not support the processing of low power data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/qos.db.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save QOS data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[0]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] QOS no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hccs.db.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.cpp:37] SIO Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:85] Save HCCS data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.h:88] HCCS no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.cpp:37] CPU_USAGE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[1]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:85] Save HCCS data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [host_usage_processor.cpp:32] Start process CPU_USAGE.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:99] TaskBasedProcess, dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.h:88] HCCS no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] NIC Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[2]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.cpp:37] CPU_FREQ Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90859] [host_usage_processor.cpp:32] Start process CPU_FREQ.
+2026-11-11 14:28:11 [WARN] [90786] [90852] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/llc.db.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.h:85] Save LLC data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90852] [data_processor.h:88] LLC no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.h:85] Save LLC data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/biu_perf.db.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.cpp:67] Check V6BlockPmu not exists
+2026-11-11 14:28:11 [WARN] [90786] [90852] [data_processor.h:88] LLC no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.h:85] Save NPU_MEM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:85] Save BLOCK_DETAIL data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.h:88] NPU_MEM no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.h:88] BLOCK_DETAIL no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[3]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.cpp:37] NETWORK_USAGE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_cpu_usage.db.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[4]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [host_usage_processor.cpp:32] Start process NETWORK_USAGE.
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_cpu_freq.db.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/nic.db.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [process_control.cpp:331] Level[5]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.cpp:37] STEP_TRACE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/nic.db.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.cpp:37] MEM_USAGE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90858] [host_usage_processor.cpp:32] Start process MEM_USAGE.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[6]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/sio.db.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:85] Save SIO data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.cpp:37] TASK Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.h:88] SIO no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[7]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:67] Check StepTrace not exists
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save TASK data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.cpp:37] ROCE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db and MetricSummary success.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] TASK no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90852] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_network_usage.db.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[8]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:153] GetAndCheckTableColumns.
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_mem_usage.db.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.cpp:204] Start get MetricSummary headers
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] DDR Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[9]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.cpp:37] SOC Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[10]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] ACC_PMU Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[11]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90860] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/freq.db and FreqParse success.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.cpp:37] API Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90860] [aicore_freq_processor.cpp:115] AicoreFreqProcessor GetData, dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/freq.db
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/roce.db.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/ascend_task.db and AscendTask success.
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/roce.db.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [process_control.cpp:331] Level[12]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.cpp:37] PCIE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90858] [pcie_processor.cpp:51] PCIeProcessor Process, dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.cpp:219] Get MetricSummary columns success
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[13]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/soc_profiler.db.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:85] Save SOC data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.cpp:37] ROCE_TIMELINE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.h:88] SOC no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[14]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/acc_pmu.db.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save ACC_PMU data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:HOST_INFO data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] ACC_PMU no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[15]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] MEMCPY_INFO Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:104] Query data success: SELECT syscnt, freq FROM FreqParse
+2026-11-11 14:28:11 [INFO] [90786] [90860] [aicore_freq_processor.cpp:136] AicoreFreqProcessor FormatData.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/ddr.db.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:221] This column[task_id] does not need to be processed.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save DDR data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:221] This column[stream_id] does not need to be processed.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] DDR no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:221] This column[subtask_id] does not need to be processed.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:221] This column[batch_id] does not need to be processed.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/trace.db and training_trace success.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[16]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/api_event.db and ApiData success.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.h:59] DBAssembler Save HOST_INFO Data.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.cpp:204] Start get ApiData headers
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_total_time.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:67] Start create HOST_INFO, sql is CREATE TABLE IF NOT EXISTS HOST_INFO (hostUid TEXT, hostName TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] KFC_TASK Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90860] [data_processor.h:85] Save AICORE_FREQ data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90860] [process_control.cpp:331] Level[17]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/pcie.db.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:67] Check MemcpyInfo not exists
+2026-11-11 14:28:11 [INFO] [90786] [90860] [data_processor.cpp:37] NETDEV_STATS Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.h:85] Save PCIE data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.h:88] PCIE no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[18]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:104] Query data success: SELECT a.start_time, a.duration, a.model_id, a.index_id, a.stream_id, a.task_id, a.context_id,a.batch_id, a.connection_id, a.host_task_type, a.device_task_type FROM AscendTask a WHERE a.device_task_type != 'UNKNOWN'
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] FUSION_TASK Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/rocereceivesend_table.db.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [process_control.cpp:331] Level[19]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90856] [sys_io_processor.cpp:238] No ROCE_TIMELINE data to save into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.cpp:37] NPU_MEM Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[20]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.cpp:37] CCU_MISSION Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.h:104] Query data success: SELECT model_id, iteration_id, FP_start, BP_end, iteration_end, iteration_time, fp_bp_time, grad_refresh_bound, data_aug_bound FROM training_trace
+2026-11-11 14:28:11 [WARN] [90786] [90860] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/netdev_stats.db.
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/ccu_add_info.db.
+2026-11-11 14:28:11 [INFO] [90786] [90860] [data_processor.h:85] Save NETDEV_STATS data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/ccu_add_info.db.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.cpp:219] Get ApiData columns success
+2026-11-11 14:28:11 [WARN] [90786] [90860] [data_processor.h:88] NETDEV_STATS no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [step_trace_processor.h:92] training_trace, has no data
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:73] There are 0 records before STEP_TRACE data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90860] [process_control.cpp:331] Level[21]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:78] There are 0 records after STEP_TRACE data filtering.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/kfc_info.db.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/fusion_task.db.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save FUSION_TASK data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/kfc_info.db.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] FUSION_TASK no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_assembler.cpp:1682] Begin to save DB:SESSION_TIME_INFO data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save KFC_TASK data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] KFC_TASK no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[22]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/npu_mem.db.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] HOST_PLATFORM Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90858] [data_processor.h:85] Save NPU_MEM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90858] [data_processor.h:88] NPU_MEM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[23]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] NPU_MODULE_MEM Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:80] create HOST_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90858] [process_control.cpp:331] Level[24]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.h:71] Start insert data to HOST_INFO
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.cpp:1682] Begin to save DB:ENUM data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_total_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.cpp:408] EnumProcessor Process.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_assembler.h:59] DBAssembler Save SESSION_TIME_INFO Data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.cpp:67] Start create SESSION_TIME_INFO, sql is CREATE TABLE IF NOT EXISTS SESSION_TIME_INFO (startTimeNs INTEGER, endTimeNs INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_OVERLAP_ANALYSIS_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/ccu.db.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_OVERLAP_ANALYSIS_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_OVERLAP_ANALYSIS_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.h:73] There are 0 records before CCU_MISSION data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.h:78] There are 0 records after CCU_MISSION data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [data_processor.h:85] Save CCU_MISSION data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save HOST_PLATFORM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90856] [data_processor.h:88] CCU_MISSION no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.h:88] HOST_PLATFORM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_total_cycles.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[25]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/npu_module_mem.db.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_assembler.cpp:1682] Begin to save DB:META_DATA data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save NPU_MODULE_MEM data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[26]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_assembler.h:59] DBAssembler Save META_DATA Data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] NPU_MODULE_MEM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.cpp:67] Start create META_DATA, sql is CREATE TABLE IF NOT EXISTS META_DATA (name TEXT, value TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] DPU Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90853] [dpu_processor.cpp:32] Start DPU Processor
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[27]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.h:104] Query data success: SELECT struct_type, id, level, thread_id, item_id, start, end, connection_id, key FROM ApiData
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:73] There are 65 records before TASK data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] OSRT_API Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [host_usage_processor.cpp:32] Start process OSRT_API.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:78] There are 65 records after TASK data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:85] Save TASK data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.h:84] insert data to HOST_INFO success
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.cpp:67] Check get_next not exists
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[28]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:73] There are 0 records before STEP_TRACE data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:78] There are 0 records after STEP_TRACE data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.cpp:37] HBM Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_runtime_api.db.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[29]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.cpp:37] MSTX Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[30]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] UB Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_total_cycles, end_time FROM MetricSummary
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/dpu.db.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/dpu.db.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [dpu_processor.cpp:51] No dpu data found.
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hbm.db.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:85] Save HBM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.h:88] HBM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90859] [data_processor.h:85] Save HBM data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90859] [data_processor.h:88] HBM no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mac_time.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[31]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.cpp:1682] Begin to save DB:NPU_INFO data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.cpp:67] Check all_reduce not exists
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:73] There are 0 records before STEP_TRACE data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:78] There are 0 records after STEP_TRACE data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:85] Save STEP_TRACE data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.h:88] STEP_TRACE no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:85] Save STEP_TRACE data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.h:88] STEP_TRACE no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.h:85] Save STEP_TRACE data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.h:88] STEP_TRACE no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[32]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/msproftx.db.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [data_processor.cpp:37] DISK_USAGE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/msproftx.db.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [host_usage_processor.cpp:32] Start process DISK_USAGE.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [msproftx_host_processor.cpp:83] msprofTx in /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI is not exists, return
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.h:59] DBAssembler Save NPU_INFO Data.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:67] Start create NPU_INFO, sql is CREATE TABLE IF NOT EXISTS NPU_INFO (id INTEGER, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[33]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.cpp:37] CHIP_TRAINS Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[34]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] HASH_INIT Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90853] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/ge_logic_stream_info.db.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/ub.db.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mac_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90853] [hash_init_processor.cpp:68] Init Hash data, dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save UB data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] UB no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/host_disk_usage.db.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[35]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] NIC_TIMELINE Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mac_ratio_extra.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[36]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:QOS data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:1257] QOS data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[37]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:HCCS data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:449] HCCS data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[38]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:LLC data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/ge_hash.db and GeHashInfo success.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_OVERLAP_ANALYSIS_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:528] LLC data not exist.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/chip_trans.db.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[39]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/chip_trans.db.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:CPU_FREQ data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_OVERLAP_ANALYSIS_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:73] There are 0 records before PA_LINK_INFO data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:1120] Host cpu freq data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:78] There are 0 records after PA_LINK_INFO data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:73] There are 0 records before ENUM_PCIE_INFO data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[40]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:78] There are 0 records after ENUM_PCIE_INFO data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:85] Save PA_LINK_INFO data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:CPU_USAGE data.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.h:88] PA_LINK_INFO no data to inject to dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:1074] Cpu usage data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [data_processor.h:85] Save ENUM_PCIE_INFO data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90861] [data_processor.h:88] ENUM_PCIE_INFO no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[41]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:NIC data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:951] SysIO NIC data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[42]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:SIO data.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [db_assembler.cpp:1379] SIO data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[43]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:NETWORK_USAGE data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:1190] Host network usage data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[44]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/nicreceivesend_table.db.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [sys_io_processor.cpp:238] No NIC_TIMELINE data to save into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:104] Query data success: SELECT hash_key, hash_value FROM GeHashInfo
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[45]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:MEM_USAGE data.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [db_assembler.cpp:1147] Host mem usage data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:ROCE data.
+2026-11-11 14:28:11 [WARN] [90786] [90854] [db_assembler.cpp:951] SysIO ROCE data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[46]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:SOC data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:792] Soc data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[47]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mac_ratio_extra, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:ACC_PMU data.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [db_assembler.cpp:319] Acc pmu data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[48]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.cpp:80] create META_DATA success
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:DDR data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [db_assembler.cpp:370] DDR data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.h:71] Start insert data to META_DATA
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[49]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_scalar_time.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.cpp:1682] Begin to save DB:AICORE_FREQ data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[50]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_assembler.h:59] DBAssembler Save AICORE_FREQ Data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:MEMCPY_INFO data.
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.cpp:67] Start create AICORE_FREQ, sql is CREATE TABLE IF NOT EXISTS AICORE_FREQ (deviceId INTEGER, timestampNs NUMERIC, freq INTEGER, dieId NUMERIC);.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[51]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:196] MemcpyInfo data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:PCIE data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[52]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [db_assembler.cpp:750] PCIe data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[53]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:NETDEV_STATS data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:479] NetDevStats data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:NPU_MEM data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [db_assembler.cpp:649] NpuMem data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[54]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:CCU_MISSION data.
+2026-11-11 14:28:11 [WARN] [90786] [90861] [db_assembler.cpp:1437] CCU mission data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[55]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:HOST_PLATFORM data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[56]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:NPU_MODULE_MEM data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [db_assembler.cpp:722] NpuModuleMem data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[57]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:1682] Begin to save DB:TASK data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[58]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:OSRT_API data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:1211] OS runtime api data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[59]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:HBM data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [db_assembler.cpp:424] HBM data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[60]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:MSTX data.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_scalar_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:570] MsprofTx data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[61]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [timeline_manager.cpp:199] Start exporting timeline!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[62]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:DPU data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:1304] Can't get dpuData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [file.cpp:475] The file not exists: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/mindstudio_profiler_output/msprof_20261111142811.json.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[63]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_scalar_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:UB data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:1411] UB data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[64]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [file.cpp:475] The file not exists: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/mindstudio_profiler_output/step_trace_20261111142811.json.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:DISK_USAGE data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:1168] Host disk usage data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.h:59] DBAssembler Save TASK Data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[65]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:67] Start create TASK, sql is CREATE TABLE IF NOT EXISTS TASK (startNs INTEGER, endNs INTEGER, deviceId INTEGER, connectionId INTEGER, globalTaskId INTEGER, globalPid INTEGER, taskType INTEGER, contextId INTEGER, streamId INTEGER, taskId INTEGER, modelId INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] NPU_OP_MEM Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[66]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/task_memory.db.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:37] COMPUTE_TASK_INFO Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[67]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] COMMUNICATION Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_scalar_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hccl_single_device.db.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.cpp:71] Check /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/host/sqlite/ge_info.db and TaskInfo success.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mte1_time.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hccl_single_device.db.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hccl_single_device.db.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.cpp:50] Can't find the db, the path is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/hccl_single_device.db.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:73] There are 0 records before COMMUNICATION_TASK_INFO data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:78] There are 0 records after COMMUNICATION_TASK_INFO data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:73] There are 0 records before COMMUNICATION_TASK_INFO data filtering, filterTime is 1794378468188175000.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:78] There are 0 records after COMMUNICATION_TASK_INFO data filtering.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save COMMUNICATION_TASK_INFO data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] COMMUNICATION_TASK_INFO no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save COMMUNICATION_OP data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [data_processor.h:88] COMMUNICATION_OP no data to inject to dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[68]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble NPU MEM data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [npu_mem_assembler.cpp:74] Can't get npuMemData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No NPU MEM data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[69]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble LLC data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [llc_assembler.cpp:79] Can't get LLcData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No LLC data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[70]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Step Trace data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.h:73] There are 316 records before API data filtering, filterTime is 1794378468185935000.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [step_trace_assembler.cpp:269] Can't get step trace data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.h:78] There are 316 records after API data filtering.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No Step Trace data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90852] [data_processor.h:85] Save API data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:104] Query data success: SELECT hashid, model_id, op_name, stream_id, task_id, block_num, mix_block_num, task_type, op_type, op_flag, batch_id, IFNULL(input_formats, 'NULL'), IFNULL(input_data_types, 'NULL'), IFNULL(input_shapes, 'NULL'), IFNULL(output_formats, 'NULL'), IFNULL(output_data_types, 'NULL'), IFNULL(output_shapes, 'NULL'), device_id, context_id, (case when op_state is 'N/A' then 'N/A' when op_state is '1' then 'dynamic' when op_state is '0' then 'static' end), IFNULL(grid_dim, 'N/A'), IFNULL(block_dim, 'N/A') FROM TaskInfo
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[71]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte1_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble SIO data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [sio_assembler.cpp:80] Can't get sioData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[72]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No SIO data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[73]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble Acc PMU data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [data_processor.h:85] Save COMPUTE_TASK_INFO data into dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90852] [acc_pmu_assembler.cpp:100] Can't get accPmuData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble NIC data
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No Acc PMU data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[74]Release Data Types: St13unordered_mapISsSsSt4hashISsESt8equal_toISsESaISt4pairIKSsSsEEE 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mte1_ratio_extra.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [sys_io_assembler.cpp:91] Can't get SysIOReceiveSendData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No NIC data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[75]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble QoS data
+2026-11-11 14:28:11 [WARN] [90786] [90853] [qos_assembler.cpp:124] Can't get qosData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No QoS data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble MsprofTx data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [msprof_tx_assembler.cpp:135] Can't get msprof_host_tx data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[76]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No MsprofTx data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[77]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble PCIe data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [pcie_assembler.cpp:77] Begin to assemble PCIe data.
+2026-11-11 14:28:11 [WARN] [90786] [90852] [pcie_assembler.cpp:81] Can't get PCIe Data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble CPU Usage data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[78]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [host_usage_assembler.cpp:173] Begin to assemble CPU Usage data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble DDR data
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No PCIe data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90853] [ddr_assembler.cpp:64] Can't get ddrData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[79]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No DDR data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[80]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble Low Power data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [low_power_assembler.cpp:55] Begin to assemble Low Power data.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble Memory Usage data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [host_usage_assembler.cpp:173] Begin to assemble Memory Usage data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [host_usage_assembler.cpp:132] Can't get host cpu data from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No CPU Usage data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[81]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte1_ratio_extra, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble RoCE data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [sys_io_assembler.cpp:105] Can't get SysIOReceiveSendData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No RoCE data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[82]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble CPU Freq data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [host_usage_assembler.cpp:173] Begin to assemble CPU Freq data.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [host_usage_assembler.cpp:112] Can't get host memory data from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No Memory Usage data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mte2_time.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[83]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble Network Usage data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [low_power_assembler.cpp:76] Assemble Low Power data success.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [host_usage_assembler.cpp:173] Begin to assemble Network Usage data.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:42] Assemble Low Power data success, begin to export
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[84]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [host_usage_assembler.cpp:152] Can't get host cpu freq data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble Stars Chip Trans data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No CPU Freq data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[85]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble HBM data
+2026-11-11 14:28:11 [WARN] [90786] [90853] [host_usage_assembler.cpp:72] Can't get host network data from dataInventory.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [hbm_assembler.cpp:64] Can't get hbmData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No Network Usage data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No HBM data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[86]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90852] [chip_trans_assembler.cpp:108] Can't get paLinkInfoData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[87]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble FUSION_TASK data
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No Stars Chip Trans data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90853] [fusion_task_assembler.cpp:82] Can't get fusion task data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[88]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble CCU_MISSION data
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No FUSION_TASK data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90857] [ccu_assembler.cpp:104] Can't get ccu mission data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble Disk Usage data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No CCU_MISSION data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[89]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [host_usage_assembler.cpp:173] Begin to assemble Disk Usage data.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte2_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble Ub data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[90]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [ub_assembler.cpp:51] Can't get ub data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No Ub data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Biu Perf data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[91]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [biu_perf_assembler.cpp:83] Can't get biuPerf data from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No Biu Perf data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble MsprofTx data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[92]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [device_tx_assembler.cpp:85] Can't get device_tx data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_mte2_ratio.
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No MsprofTx data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Stars Soc Info data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[93]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90857] [stars_soc_assembler.cpp:63] Can't get socBandwidthData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90852] [host_usage_assembler.cpp:92] Can't get host disk data from dataInventory.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [json_assembler.cpp:33] Begin to Assemble OS Runtime API data
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No Disk Usage data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No Stars Soc Info data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [host_usage_assembler.cpp:173] Begin to assemble OS Runtime API data.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[94]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[95]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble DPU data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [dpu_assembler.cpp:151] Start DPU Assembler
+2026-11-11 14:28:11 [WARN] [90786] [90852] [dpu_assembler.cpp:155] Can't get dpuData from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble HCCS data
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No DPU data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90857] [hccs_assembler.cpp:64] Can't get hccsData from dataInventory
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No HCCS data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[96]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_assembler.cpp:1682] Begin to save DB:NPU_OP_MEM data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[97]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:COMMUNICATION data.
+2026-11-11 14:28:11 [WARN] [90786] [90852] [db_assembler.cpp:692] NpuOpMem data not exist.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:239] Communication op data not exist.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:290] Communication task data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[98]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [json_assembler.cpp:33] Begin to Assemble Communication data
+2026-11-11 14:28:11 [WARN] [90786] [90853] [host_usage_assembler.cpp:41] Can't get host runtime api data from dataInventory.
+2026-11-11 14:28:11 [WARN] [90786] [90852] [hccl_assembler.cpp:170] Can't get hccl task data and hccl op data from dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[99]Release Data Types: 
+2026-11-11 14:28:11 [WARN] [90786] [90853] [json_assembler.cpp:48] No OS Runtime API data, don't export deliverable!
+2026-11-11 14:28:11 [WARN] [90786] [90852] [json_assembler.cpp:48] No Communication data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[100]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Api data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.cpp:1682] Begin to save DB:API data.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[101]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_assembler.cpp:1682] Begin to save DB:COMPUTE_TASK_INFO data.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte2_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_assembler.h:59] DBAssembler Save COMPUTE_TASK_INFO Data.
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.cpp:67] Start create COMPUTE_TASK_INFO, sql is CREATE TABLE IF NOT EXISTS COMPUTE_TASK_INFO (name INTEGER, globalTaskId INTEGER PRIMARY KEY, blockNum INTEGER, mixBlockNum INTEGER, taskType INTEGER, opType INTEGER, inputFormats INTEGER, inputDataTypes INTEGER, inputShapes INTEGER, outputFormats INTEGER, outputDataTypes INTEGER, outputShapes INTEGER, attrInfo INTEGER, opState INTEGER, hf32Eligible INTEGER, gridDim INTEGER, blockDim INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_fixpipe_time.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_assembler.h:59] DBAssembler Save CANN_API Data.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.cpp:67] Start create CANN_API, sql is CREATE TABLE IF NOT EXISTS CANN_API (startNs INTEGER, endNs INTEGER, type INTEGER, globalTid INTEGER, connectionId INTEGER PRIMARY KEY, name INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:80] create NPU_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:42] Assemble Api data success, begin to export
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_fixpipe_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:71] Start insert data to NPU_INFO
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_fixpipe_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:84] insert data to NPU_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[102]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.h:59] DBAssembler Save RANK_DEVICE_MAP Data.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:67] Start create RANK_DEVICE_MAP, sql is CREATE TABLE IF NOT EXISTS RANK_DEVICE_MAP (rankId INTEGER, deviceId INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Task Scheduler data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_fixpipe_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aic_icache_miss_rate.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:42] Assemble Task Scheduler data success, begin to export
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:80] create RANK_DEVICE_MAP success
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[103]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:71] Start insert data to RANK_DEVICE_MAP
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.cpp:37] OVERLAP_ANALYSIS Run. Dir is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI
+2026-11-11 14:28:11 [WARN] [90786] [90857] [overlap_analysis_processor.cpp:71] No comm task data found
+2026-11-11 14:28:11 [WARN] [90786] [90857] [overlap_analysis_processor.cpp:76] No kfc comm info found
+2026-11-11 14:28:11 [INFO] [90786] [90857] [overlap_analysis_processor.cpp:174] Find 0 comp tasks not in all tasks.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:32] sort and union all comp task in overlap analysis for device 0 start
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:39] sort and union all comp task in overlap analysis for device 0 end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90857] [data_processor.h:85] Save OVERLAP_ANALYSIS data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[104]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Block Detail data
+2026-11-11 14:28:11 [WARN] [90786] [90857] [block_detail_assembler.cpp:58] Can't get blockDetailData from dataInventory.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [json_assembler.cpp:48] No Block Detail data, don't export deliverable!
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[105]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:33] Begin to Assemble Overlap Analysis data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_icache_miss_rate, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:84] insert data to RANK_DEVICE_MAP success
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_total_time.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:32] Generate overlap analysis events start
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[106]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.cpp:1682] Begin to save DB:OVERLAP_ANALYSIS data.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:39] Generate overlap analysis events end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:32] Dump overlap analysis events start
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.h:59] DBAssembler Save OVERLAP_ANALYSIS Data.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:67] Start create OVERLAP_ANALYSIS, sql is CREATE TABLE IF NOT EXISTS OVERLAP_ANALYSIS (id INTEGER PRIMARY KEY, deviceId INTEGER, startNs NUMERIC, endNs NUMERIC, type INTEGER);.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [time_logger.h:39] Dump overlap analysis events end, cost time = 0 ms
+2026-11-11 14:28:11 [INFO] [90786] [90857] [json_assembler.cpp:42] Assemble Overlap Analysis data success, begin to export
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[107]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[108]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_total_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.cpp:80] create OVERLAP_ANALYSIS success
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_total_cycles.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:71] Start insert data to OVERLAP_ANALYSIS
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_runner.h:84] insert data to OVERLAP_ANALYSIS success
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_total_cycles, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[109]Release Data Types: St6vectorIN8Analysis6Domain19OverlapAnalysisDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_vec_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_vec_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_vec_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_OVERLAP_ANALYSIS_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_HCCL_RDMA_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_HCCL_RDMA_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_HCCL_RDMA_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_vec_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.h:84] insert data to META_DATA success
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[110]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mac_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mac_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mac_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mac_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_scalar_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_scalar_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_scalar_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_scalar_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte1_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte1_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte1_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.cpp:80] create COMPUTE_TASK_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.h:71] Start insert data to COMPUTE_TASK_INFO
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte1_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte2_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90852] [db_runner.h:84] insert data to COMPUTE_TASK_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90852] [process_control.cpp:331] Level[111]Release Data Types: St6vectorIN8Analysis6Domain12TaskInfoDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte2_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte2_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte2_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte3_time.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte3_time, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_mte3_ratio.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte3_ratio, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:236] GetTaskBasedData, dbPath is /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI/device_0/sqlite/metric_summary.db, column name is aiv_icache_miss_rate.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:91] Start query data
+2026-11-11 14:28:11 [INFO] [90786] [90855] [db_runner.h:104] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_icache_miss_rate, end_time FROM MetricSummary
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:301] FormatTaskBasedData.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [unified_pmu_processor.cpp:221] This column[end_time] does not need to be processed.
+2026-11-11 14:28:11 [INFO] [90786] [90855] [data_processor.h:85] Save TASK_PMU_INFO data into dataInventory
+2026-11-11 14:28:11 [INFO] [90786] [90855] [process_control.cpp:331] Level[112]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90857] [db_assembler.cpp:1682] Begin to save DB:SAMPLE_PMU_TIMELINE data.
+2026-11-11 14:28:11 [INFO] [90786] [90859] [db_assembler.cpp:1682] Begin to save DB:SAMPLE_PMU_SUMMARY data.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_assembler.cpp:1682] Begin to save DB:TASK_PMU_INFO data.
+2026-11-11 14:28:11 [WARN] [90786] [90857] [db_assembler.cpp:1024] UnifiedSampleTimelinePmu data not exist.
+2026-11-11 14:28:11 [WARN] [90786] [90859] [db_assembler.cpp:1051] UnifiedSampleSummaryPmu data not exist.
+2026-11-11 14:28:11 [INFO] [90786] [90857] [process_control.cpp:331] Level[113]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90859] [process_control.cpp:331] Level[114]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_assembler.h:59] DBAssembler Save TASK_PMU_INFO Data.
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.cpp:67] Start create TASK_PMU_INFO, sql is CREATE TABLE IF NOT EXISTS TASK_PMU_INFO (timestampNs INTEGER, globalTaskId INTEGER, name INTEGER, value NUMERIC);.
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.cpp:80] create CANN_API success
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:71] Start insert data to CANN_API
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.cpp:80] create TASK_PMU_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.h:71] Start insert data to TASK_PMU_INFO
+2026-11-11 14:28:11 [INFO] [90786] [90856] [db_runner.h:84] insert data to TASK_PMU_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90856] [process_control.cpp:331] Level[115]Release Data Types: St6vectorIN8Analysis6Domain14UnifiedTaskPmuESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90853] [db_runner.h:84] insert data to CANN_API success
+2026-11-11 14:28:11 [INFO] [90786] [90853] [process_control.cpp:331] Level[116]Release Data Types: St6vectorIN8Analysis6Domain7ApiDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:80] create TASK success
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.h:71] Start insert data to TASK
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.h:84] insert data to TASK success
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_assembler.cpp:153] Processor CreateTableIndex, table is TASK , indexName is TaskIndex.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:122] Start create TASK index, sql is CREATE INDEX IF NOT EXISTS TaskIndex ON TASK (startNs,globalTaskId);.
+2026-11-11 14:28:11 [INFO] [90786] [90861] [db_runner.cpp:135] create TASK index success
+2026-11-11 14:28:11 [INFO] [90786] [90861] [process_control.cpp:331] Level[117]Release Data Types: St6vectorIN8Analysis6Domain14AscendTaskDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.cpp:80] create AICORE_FREQ success
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.h:71] Start insert data to AICORE_FREQ
+2026-11-11 14:28:11 [INFO] [90786] [90854] [db_runner.h:84] insert data to AICORE_FREQ success
+2026-11-11 14:28:11 [INFO] [90786] [90854] [process_control.cpp:331] Level[118]Release Data Types: St6vectorIN8Analysis6Domain12LowPowerDataESaIS2_EE 
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_HCCL_RDMA_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_HCCL_RDMA_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_HCCL_RDMA_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_MSTX_EVENT_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_MSTX_EVENT_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_MSTX_EVENT_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_MSTX_EVENT_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_MSTX_EVENT_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_MSTX_EVENT_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_HCCL_TRANSPORT_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_HCCL_TRANSPORT_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_HCCL_TRANSPORT_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_HCCL_TRANSPORT_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_HCCL_TRANSPORT_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_HCCL_TRANSPORT_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_HCCL_LINK_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_HCCL_LINK_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_HCCL_LINK_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_HCCL_LINK_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_HCCL_LINK_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_HCCL_LINK_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_MEMCPY_OPERATION Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_MEMCPY_OPERATION, sql is CREATE TABLE IF NOT EXISTS ENUM_MEMCPY_OPERATION (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_MEMCPY_OPERATION success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_MEMCPY_OPERATION
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_MEMCPY_OPERATION success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_HCCL_DATA_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_HCCL_DATA_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_HCCL_DATA_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_HCCL_DATA_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_HCCL_DATA_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_HCCL_DATA_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_MODULE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_MODULE, sql is CREATE TABLE IF NOT EXISTS ENUM_MODULE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_MODULE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_MODULE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_MODULE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_assembler.h:59] DBAssembler Save ENUM_API_TYPE Data.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:67] Start create ENUM_API_TYPE, sql is CREATE TABLE IF NOT EXISTS ENUM_API_TYPE (id INTEGER PRIMARY KEY, name TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.cpp:80] create ENUM_API_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:71] Start insert data to ENUM_API_TYPE
+2026-11-11 14:28:11 [INFO] [90786] [90858] [db_runner.h:84] insert data to ENUM_API_TYPE success
+2026-11-11 14:28:11 [INFO] [90786] [90858] [process_control.cpp:331] Level[119]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.cpp:80] create SESSION_TIME_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:71] Start insert data to SESSION_TIME_INFO
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:84] insert data to SESSION_TIME_INFO success
+2026-11-11 14:28:11 [INFO] [90786] [90860] [process_control.cpp:331] Level[120]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_assembler.h:59] DBAssembler Save STRING_IDS Data.
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.cpp:67] Start create STRING_IDS, sql is CREATE TABLE IF NOT EXISTS STRING_IDS (id INTEGER PRIMARY KEY, value TEXT);.
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.cpp:80] create STRING_IDS success
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:71] Start insert data to STRING_IDS
+2026-11-11 14:28:11 [INFO] [90786] [90860] [db_runner.h:84] insert data to STRING_IDS success
+2026-11-11 14:28:11 [INFO] [90786] [90860] [process_control.cpp:331] Level[121]Release Data Types: 
+2026-11-11 14:28:11 [INFO] [90786] [90786] [py_init_parser.cpp:218] C pipeline finished, prof path: /mnt/workspace/tilelang-ascend/examples_experiment/dsa_sparse_finetune/perf_tuning/fla_chunk_delta_prof_r1/app_baseline/PROF_000001_20261111142747809_00090301FEMJMOBI, flags: 0xb.

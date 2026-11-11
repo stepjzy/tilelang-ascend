@@ -1,0 +1,28 @@
+{
+  "operator": "fla_chunk_delta",
+  "iteration": 1,
+  "timestamp": "2026-11-11T15:00:00+08:00",
+  "kernel_time_us": {"fwd": 7020.5, "bwd": 9160.0, "total": 16180.5},
+  "shape": {"B": 1, "S": 8192, "H": 64, "DK": 128, "DV": 128, "chunk_size": 64},
+  "dtypes": {"fwd": "fp16 (g/gk fp32)", "bwd": "bf16 (g/gk fp32)"},
+  "branch": "wrapper defaults (no h0/ht, save_new_value=True, use_exp2=False, scale=DK**-0.5)",
+  "test_command": "source set_env.sh && python examples_experiment/dsa_sparse_finetune/test_fla_chunk_delta.py --level all --bench",
+  "timing_method": "do_bench warmup=20 rep=10 mean, device-side NPU events (test --bench sentinel, DESIGN SS9.4)",
+  "precision_status": "pass (Stage 2: L0 6/6, L1 10/10, L2 10/10, Boundary 5/5, coverage 23 PASS/0 MISS, independent recheck pass)",
+  "programming_mode": "Developer (threads=2, fixed-core striped task loop, NSLOT=1 lockstep relays)",
+  "target_total_us": 3400,
+  "overshoot": "4.76x",
+  "source_sha256": "see fla_chunk_delta_kernel_iter1.sha256",
+  "known_structure": {
+    "CORE_EFF": 20,
+    "NCHAIN": 128,
+    "gemms_per_chunk": {"fwd": 2, "bwd": 3},
+    "relays": {"fwd": 4, "bwd": 7},
+    "scalar_loops_per_chunk": {"fwd": "2 (BS=64 extract + DK=128 decay)", "bwd": "2 (BS=64 x2 stmts + DK=128)"},
+    "suspects_from_debug_log": [
+      "T.serial scalar extraction loops: per-iteration MTE2_S/S_V flag pairs + PIPE_ALL barriers (auto-sync conservatism)",
+      "exp-prefixed same-sized fills (mask pinning workaround)",
+      "NSLOT=1 lockstep relay handshakes"
+    ]
+  }
+}

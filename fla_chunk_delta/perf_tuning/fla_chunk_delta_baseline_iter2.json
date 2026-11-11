@@ -1,0 +1,23 @@
+{
+  "operator": "fla_chunk_delta",
+  "iteration": 2,
+  "timestamp": "2026-11-11T15:10:00+08:00",
+  "optimization": "threads=1 prep kernel (GT/GE/GD gate/decay tiles, fp32 hw transpose + row_expand_sub, direct-difference form) eliminating the per-chunk T.serial scalar extraction loops (~192 scalar iters/chunk with per-iter flag pairs) + g-span 16KB loads + in-kernel exps; main kernels read contiguous 256B/512B GT/GD spans and gate via row_expand_mul; GT/GE/GD tensors [B,NT,H,BS]/[B,NT,H,DK] H-exact, UB staging padded to HP=ceil(H/8)*8 (transpose 32B-align + row_expand 8..248 rows)",
+  "kernel_time_us": {
+    "fwd_bench": 4219.4, "bwd_bench": 5782.6, "total_bench": 10002.0,
+    "fwd_main_only_msprof": 3765.5, "bwd_main_only_msprof": 5694.0,
+    "fwd_prep_msprof": 17.9, "bwd_prep_msprof": 22.1,
+    "note": "bench includes prep launch + wrapper overhead (~250-450us)"
+  },
+  "improvement_vs_baseline": {"fwd": "-39.9%", "bwd": "-36.9%", "total": "-38.2%"},
+  "shape": {"B": 1, "S": 8192, "H": 64, "DK": 128, "DV": 128, "chunk_size": 64},
+  "precision": "L0 6/6 PRECISION_PASS (same session as bench; ratios 1.0000, max_abs unchanged vs Stage-2 within tolerance)",
+  "adopted": true,
+  "profiling_evidence": {
+    "baseline_r1": "AIV scalar pipe fwd 4906us (79%) / bwd 6972us (84%); AIC cross-core flag waits fwd ~6.1ms",
+    "iter2_main": "AIV scalar fwd 1577us (46%) / bwd 2625us (50%); AIC wait_id0+id2 fwd 3314us (98% of cube wall) / bwd 4991us; scalar-loop source pattern verified GONE (0 x for-i<32 loops, 0 GetValue/SetValue in fwd generated source)",
+    "attribution_confirmed": "yes (msprof op main-only + generated source audit)"
+  },
+  "next_bottleneck": "NSLOT=1 lockstep relay handshakes: single shared slot per core serializes all chains' C<->V exchanges (cross-chain WAR); AIC spends 98% waiting on V-side relay flags",
+  "next_hint": "Round 3: NSLOT ring (slot = (k_task*NT+i_t) % NSLOT) to decouple cross-chain WAR. Natural V-lead bound = in-flight chunks <= chains/core (7 at bench) since every chain's V-side stalls on its own C round-trip per chunk -> NSLOT=16 satisfies ring safety (NSLOT > 2L+1) within the 15-set flag counter capacity WITHOUT a manual throttle flag; bwd ws5/ws6 merge as follow-up"
+}

@@ -1,0 +1,25 @@
+{
+  "stage": "3-round2",
+  "iteration": 8,
+  "date": "2026-11-11",
+  "operator": "fla_chunk_delta",
+  "base_kernel_sha256": "1bfd3d80139e7270ae7585cc09a050e0274065ad4fa909de1a842005b6198d68",
+  "shape": "B=1,S=8192,H=64,DK=128,DV=128,cs=64",
+  "dtypes": "fwd fp16 / bwd bf16, g+gk full gating, wrapper default branch",
+  "timing": "do_bench warmup=20 rep=10 mean, device-side NPU events (--bench sentinel)",
+  "fwd_us": 2546.2,
+  "bwd_us": 4549.7,
+  "total_us": 7095.9,
+  "total_source": "round-1 final state, independently re-verified by orchestrator (task brief 2026-11-11); final_summary cross-session mean ~7148us, spread 1.4%",
+  "precision": "pass (--level all --bench exit 0, max_abs identical to Stage-2 record)",
+  "programming_mode": "Developer (threads=2 main + threads=1 prep, AUTO_CV_COMBINE/AUTO_CV_SYNC/AUTO_SYNC/MEMORY_PLANNING all on)",
+  "target_us": 3400,
+  "noise_threshold_pct": 3.0,
+  "known_measurement_defect": "perf_tuning/fla_chunk_delta_bench_entry.py fwd-main/dump-src entries hardcode BV=64 (old-signature variant, 3318.8us, NOT comparable to the BV=128 final bench sentinel) - fixed in R8",
+  "round2_focus": [
+    "R8: fix bench_entry BV hardcode; regenerate fwd source dump at true BV=128; barrier/statement census",
+    "R9: bwd q~ externalization to prep (removes ~13 V-statements + 2 relay handshakes per chain-chunk) + GE scale fold",
+    "R10: bwd single-chain tail batch (kill last-batch Select-redirect duplicate work)",
+    "R11+: fwd k_g fold / fwd 2-chain BV=128 / input prefetch rings / ws5+ws6 L0C-accumulate merge / manual AUTO_SYNC experiment"
+  ]
+}

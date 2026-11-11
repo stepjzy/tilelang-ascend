@@ -1,0 +1,39 @@
+{
+  "stage": "3-round2",
+  "iteration": 13,
+  "date": "2026-11-11",
+  "operator": "fla_chunk_delta",
+  "state": "TERMINAL (adopted round-2 result; R12 probe rolled back)",
+  "kernel_sha256": "e5c6f1540f08cf9c61dc80df8f1a87e69557661c6e98de043d13925adcc48322",
+  "shape": "B=1,S=8192,H=64,DK=128,DV=128,cs=64",
+  "dtypes": "fwd fp16 / bwd bf16, g+gk full gating, wrapper default branch",
+  "timing": "do_bench warmup=20 rep=10 mean, device-side NPU events (--bench sentinel)",
+  "fwd_us": 2551.3,
+  "bwd_us": 3518.6,
+  "total_us": 6069.9,
+  "total_us_repeat": 6066.7,
+  "cross_session_range": "6067-6284 (session-level variance ~3%: the R10b session measured fwd 2649/bwd 3635)",
+  "round2_entry": {"fwd_us": 2538.3, "bwd_us": 4559.8, "total_us": 7098.1},
+  "round2_gain_us": 1028.2,
+  "round2_gain_pct": -14.5,
+  "cumulative_from_stage2_pct": -62.5,
+  "target_us": 3400,
+  "gap_x": 1.78,
+  "main_only_msprof": {"fwd_us": 2573.2, "bwd_us": 3044.7, "bwd_prep_us": 382.6},
+  "precision": "pass (--level all --bench exit 0: L0 6/6 + L1 10/10 + L2 10/10 + Boundary 5/5; max_abs identical to the Stage-2 records; L1 tasktail cases exercise the NTAIL=1 and NTAIL=2 tail paths)",
+  "terminal_pipe_evidence": {
+    "fwd_main": "AIC wait_id0(ws1) 1310-1347us=51%, wait_id2(ws3) 1135-1204us=45%; AIV wait_id1(ws2) 49%, wait_id3(ws4) 47%; fixpipe 16-19%; cube 6.6%; GM bw 5.8-8.7%",
+    "bwd_main": "AIC wait_id0(ws1) 1238-1269us=41%, fixpipe 30%, cube 8.4%, GM bw 8.5-10.7%; AIV wait_id3(ws2) 29% + spread readback waits"
+  },
+  "adopted_this_round": [
+    "R9/iter9: bwd select-storm removal + guarded single-chain tail (NFULL=NCHAIN//(2*CORE_EFF) provably in-bounds; remainder as guarded single-chain tail batches): bwd 4559.8 -> 3929.4 (-13.8%)",
+    "R10/iter10: bwd q~ externalization to the prep kernel (bit-identical arithmetic; main drops 13 V-statements/chain-chunk + 2 relay handshakes; QT read on the C side as one [BS,DK] gm_to_l1): bwd 3929.4 -> ~3635 same-session (-7.5%)"
+  ],
+  "rejected_this_round": [
+    "R10-detour: qdo_scale fold into QT gate: bwd 3538.7 (-9.9%) but l0_bwd_opts dh0 ratio 0.9601 FAIL (golden quantizes qt=bf16(q*e^g) unscaled; recurrence feedback amplifies 2.4e-07 -> 2.3e-03)",
+    "R11a: ws5/ws6 L0C-accumulate merge: algebra requires the scale inside the bf16 q~ operand = the failed fold; no scale-free form",
+    "R11b: fwd 2-chain BV=128 CE=16 (zero tail, half the round trips): aicore exception 507015 -- UB demand 284KB/AIV > 196KB forces the memory planner's lifetime-overlap fallback; AscendSyncInsert misses cross-pipe WAR on overlapped different-name buffers (h16_ub_b == vn_ub_b at offset 90496); same-name-only sharing still needs 203KB",
+    "R12/iter12: prologue MTE2 load hoist + per-half/per-chain scratch splits: -1.0% (noise) despite bwd PIPE_V 25 -> 14/iter -- ROLLED BACK; diagnostic: barrier drains are NOT the remaining cost"
+  ],
+  "exhaustion_verdict": "kernel-level means exhausted with full evidence chain (see fla_chunk_delta_final_summary.md round-2 section); remaining 1.78x gap is bound by the serial-recurrence cross-core round trips (both sides 41-51% mutual wait) + the golden-quantization coupling that blocks operand folds + the UB/sync toolchain limits that block the 2-chain fwd"
+}
