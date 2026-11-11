@@ -14,7 +14,7 @@
 | fla_chunk_intra_token_parallel | ⏳ 分支已 push，待提 PR | — | msprof 流水图驱动瓶颈重归因（空闲 Cube 卸载 -49%）；四条直觉瓶颈实测证伪史；分离核 relay 地板论证；19150→1739us（11.0×，目标 370us 经论证物理不可达） |
 | fla_chunk_o | 🔄 PR open | [#1953](https://github.com/tile-ai/tilelang-ascend/pull/1953) | CV 中继型算子的同步协议地板画像法（msprof 消融 + host 分发地板核算）；Developer 模式边界实证；3.285→1.417ms（-57%，目标 1320us 为工具链级地板所封） |
 | fla_chunk_inter | ⏳ 分支已 push，待提 PR | — | 两轮完整证据链：结构优化全家桶（NK-merge/1-late flag/C 侧对角化/装载批处理，19556→6741.8us，-65.5%）；D-1 交付缺陷定位→D-2 scratch-free 修复→第二轮设计首版硬约束前置（缺陷知识进设计层）；重排家族 6 变体证伪 + 双墙锁步地板核算；分设环境全量重迁移（flag slot 碰撞等新发现） |
-| fla_chunk_intra | ⏳ 分支已 push，待提 PR | — | 跨核 flag 16 槽硬截断实锤定位法（40 flag 全碰撞 → kernel 边界作 V→C 同步）；逐列循环携带依赖的 masked-GEMM 重表述；roofline 下限驱动的目标重定决策链（540us 物理不可达 → 先实测再定 → 验收 ≈11.5ms）；19774→11443us（-42.1%）；【分设重验】纯 kernel 主口径 11188us（msprof Task Duration，达标）+ host 分发地板识别与 #1948 杠杆验证（1450→700us/call，do_bench 12105→11343us 与旧环境持平）；双口径画像归档 |
+| fla_chunk_intra | 🔄 PR open | [#2004](https://github.com/tile-ai/tilelang-ascend/pull/2004) | 跨核 flag 16 槽硬截断实锤定位法；逐列循环携带依赖的 masked-GEMM 重表述；roofline 下限驱动的目标重定（540us 物理不可达 → 验收 ≈11.5ms）；19774→11443us（-42.1%）；纯 kernel 主口径 11188us（达标）+ host 分发地板识别与 #1948 验证；PR 评审返工沉淀"CI 收集机制核查 + 描述一致性核查"入 migration skill（#1953/#2004 双坑闭环） |
 | fla_chunk_delta | ⏳ 分支已 push，待提 PR | — | 串行递推算子的跨核往返延迟地板画像法（两轮归因修正：barrier 假设被 census 证伪 → 真因往返等待，Cube 仅 6.6-8.4%）；golden 量化点契约对优化空间的封锁实测；threads=1 prep kernel 根除标量链；16180.5→6077.3us（-62.5%，目标 3400us 判定 1.79× 不可达，地板核算≈实测，用户裁定交付） |
 
 ## 维护规则

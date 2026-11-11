@@ -21,9 +21,10 @@ CANN 跨核 flag「16 槽硬截断」的实锤定位法（40 个 flag ID 全碰�
 
 ## 交付物
 
-- 分支 `feat/fla-chunk-intra-pr`（origin @18973eb9，基于 upstream/ascendc_pto@557b11b8）/ PR: 待用户网页创建（compare 入口 https://github.com/tile-ai/tilelang-ascend/compare/ascendc_pto...stepjzy:feat/fla-chunk-intra-pr）
-- 交付文件：`examples_experiment/dsa_sparse_finetune/example_fla_chunk_intra.py`（1428 行）+ `test_example_fla_chunk_intra.py`（215 行）；交付测试 4 用例全绿（含 bench shape）
-- PR 文稿：本目录 `PR_DESCRIPTION.md`（dev-journal 权威正本）
+- 分支 `feat/fla-chunk-intra-pr`（origin @37285182，基于 upstream/ascendc_pto@4805777d + 评审返工 commit）/ **PR: [#2004 open](https://github.com/tile-ai/tilelang-ascend/pull/2004)**（2026-11-11 用户提交）
+- 交付文件：`examples_experiment/dsa_sparse_finetune/example_fla_chunk_intra.py` + `test_example_fla_chunk_intra.py`
+- **评审返工（2026-11-11，committer bingmeiyou 两条意见，commit 37285182）**：①example 补 `__main__` smoke 入口（bench_test.sh 收集判 PASS 需输出 "Test Passed!"，NPU 实跑 SMOKE_PASS）；②交付测试 check_output 补 inf/nan 结构比对（与 PR 描述声明及开发套件 check_precision 同构，4 用例 14 检查全过）——验证日志 `perf_tuning/reval/review_fix_verification.log`；**对应流程缺口已写入 tilelang-op-migration skill Phase 3（CI 收集机制核查 + 描述一致性核查）与起草铁律**
+- PR 文稿：本目录 `PR_DESCRIPTION.md`（dev-journal 权威正本，纯 kernel 主口径）
 
 ## 新环境重验证（2026-11-06，分设架构）
 
