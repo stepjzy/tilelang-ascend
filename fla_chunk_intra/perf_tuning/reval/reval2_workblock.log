@@ -1,0 +1,48 @@
+=== SECTION L0 ===
+[PRECISION_PASS] l0:l0_fwd_dk64 Aqk shape=(1,128,4,64) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l0:l0_fwd_dk64 Akk shape=(1,128,4,64) matched_ratio=1.000000 max_abs=4.883e-04
+[PRECISION_PASS] l0:l0_fwd_bench_repr Aqk shape=(1,1024,64,128) matched_ratio=1.000000 max_abs=3.125e-02
+[PRECISION_PASS] l0:l0_fwd_bench_repr Akk shape=(1,1024,64,128) matched_ratio=1.000000 max_abs=1.250e-01
+[PRECISION_PASS] l0:l0_bwd_min dq2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=4.578e-05
+[PRECISION_PASS] l0:l0_bwd_min dk2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=6.104e-05
+[PRECISION_PASS] l0:l0_bwd_min dg2 shape=(1,64,2,128) matched_ratio=1.000000 max_abs=7.629e-05
+[PRECISION_PASS] l0:l0_bwd_min db_post shape=(1,64,2,128) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_min dg_post shape=(1,64,2,128) matched_ratio=0.999939 max_abs=2.594e-04
+[PRECISION_PASS] l0:l0_bwd_repr dq2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=7.629e-05
+[PRECISION_PASS] l0:l0_bwd_repr dk2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=1.831e-04
+[PRECISION_PASS] l0:l0_bwd_repr dg2 shape=(2,256,4,128) matched_ratio=1.000000 max_abs=2.441e-04
+[PRECISION_PASS] l0:l0_bwd_repr db_post shape=(2,256,4,128) matched_ratio=1.000000 max_abs=1.311e-04
+[PRECISION_PASS] l0:l0_bwd_repr dg_post shape=(2,256,4,128) matched_ratio=0.999882 max_abs=4.883e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dq2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=9.155e-05
+[PRECISION_PASS] l0:l0_bwd_dk64 dk2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dg2 shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.221e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 db_post shape=(1,128,4,64) matched_ratio=1.000000 max_abs=1.068e-04
+[PRECISION_PASS] l0:l0_bwd_dk64 dg_post shape=(1,128,4,64) matched_ratio=1.000000 max_abs=2.747e-04
+Test Passed!
+=== SECTION BENCH x4 ===
+RUN1
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.220 ms (10219.7 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.222 ms (1222.1 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 11441.9 us
+RUN2
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.335 ms (10335.4 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.008 ms (1007.8 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 11343.2 us
+RUN3
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.235 ms (10235.0 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 1.004 ms (1004.3 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 11239.2 us
+RUN4
+[BENCH] perf_fwd_bench shape=(1,8192,64,128) fwd 5-kernel device time = 10.359 ms (10359.2 us)  [warmup=20 rep=10 mean]
+[BENCH] perf_bwd_bench shape=(1,8192,8,128) bwd 1-kernel device time = 0.989 ms (988.6 us)  [warmup=20 rep=10 mean]
+[BENCH] fwd+bwd kernel total = 11347.8 us
+=== SECTION GAP ===
+[DIAG] A1 stage_alone  = 417.4 us
+[DIAG] A2 gemm_alone   = 653.8 us
+[DIAG] B  chain        = 971.2 us
+[DIAG] C1 in_chain_stage  = 408.2 us (min 389.8)
+[DIAG] C2 in_chain_gemm+gap = 816.7 us (min 800.1)
+[DIAG] D  host_launch_per_call = 700.0 us (wall, incl. workspace allocs)
+[DIAG] E  workspace_alloc_set = 74.4 us (5 tensors, cached)
+[DIAG] DONE
+WORKBLOCK2_DONE

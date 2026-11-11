@@ -1,12 +1,16 @@
 # fla_chunk_intra Stage 3 终态报告（R1 final summary）
 
-> **【2026-11-06 重验证补录】** 本报告数字为旧环境（本地直连 910B3 主机，x86 host）实测。
+> **【2026-11-06 重验证补录 / 2026-11-07 更新】** 本报告数字为旧环境（本地直连 910B3 主机，x86 host）实测。
 > 分设架构（CPU 唯一真源 / NPU `DevEnvC_DCbyi_npu`：1×910B3 + 22 vCPU ARM host）重验证结论见
 > `reval/reval_summary.md`：精度 90/90 复现；**纯 kernel 时间（msprof Task Duration）fwd 10395.1 +
-> bwd 793.0 = 11188.1us**（在本文验收建议 ≈11.5ms 带内，设备侧无退化）；do_bench 新环境 12105.3us
-> （bwd 链受新环境 host 分发地板 ~1.45ms/调用 逐 rep 暴露，设备工作量仅 793us——pipelining 失效
-> regime，详见 reval host 地板核算）。**PR 性能主口径经用户决策（2026-11-06）改为纯 kernel 时间**，
-> do_bench 保留为上游测试样例对齐口径的补充披露。以下原文未改动。
+> bwd 793.0 = 11188.1us**（在本文验收建议 ≈11.5ms 带内，设备侧无退化）。
+> 【11-06 记录】新环境旧基线（463c234c，无 #1948）do_bench 12105.3us——bwd 链曾被新环境 host
+> 分发地板（1450us/调用 > 设备 793us）逐 rep 暴露。
+> 【11-07 更新】**该 host 分发地板已被基线更新消除**（4805777d 含上游 #1948 懒构造 TVM Analyzer）：
+> host 地板 1450→700us，bwd do_bench 1676→1055.7us，合计 12105→**11343.0us**，与旧环境 11442.8
+> 持平（-0.9%）；PR 分支已同步同基线（551b85cd）。详见 `reval/reval2_summary.md`。
+> **PR 性能主口径经用户决策（2026-11-06）为纯 kernel 时间**，do_bench 保留为上游测试样例
+> 对齐口径的补充披露。以下原文未改动。
 
 日期：2026-11-03。终态实现快照：`history_version/fla_chunk_intra_perf_r1_final.py`。
 迭代日志：`fla_chunk_intra_perf_log.md`；优化点清单：`fla_chunk_intra_optimization_log.md`；
