@@ -66,7 +66,8 @@ per-(b,h) matmul 循环逐位交叉验证）
   max_abs_error_limit 1e-2、required_matched_ratio 0.99（双门限：逐元素
   `|actual-golden| <= atol + rtol*|golden|` 且整体 matched_ratio 与 max_abs
   同时达标）
-- **通过条件**：L0/L1 全部 ratio >= 0.99 且 max_abs <= 1e-2；L2 验证域外输入
+- **通过条件**：L0/L1 全部 ratio >= 0.99 且 max_abs <= 1e-2；golden 非有限
+  位置做结构比对（非有限位置逐一重合且 NaN/Inf 模式相等）；L2 验证域外输入
   被 ValueError 确定性拒绝
 - **参考实现**：PyTorch golden（fp32 域 + `torch.exp2` 语义，与上游 Triton
   `chunk_kda_bwd_dqkwg` 对齐验证）
@@ -124,6 +125,4 @@ per-(b,h) matmul 循环逐位交叉验证）
   `ascend_vid_reduction.cc` 的 broadcast/跨 vid 归约缺口）不可用；修复后装载
   带宽翻倍。HBM 唯一 IO 物理界 2980 μs@100% / 3673 μs@81%（同平台实证最佳
   效率）。
-- **结论**：本工具链与 910B3 架构下，该算子当前实现形态的现实可达值 ≈
-  6740 μs，本实现已贴线；进一步逼近 HBM 物理界依赖上游工具链解锁
-  （fp32 gemm、threads=2 vid 语义、V↔C 片上直连，均可独立修复）。
+

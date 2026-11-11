@@ -210,3 +210,23 @@ HEAD）→ CI 复跑 Benchmark Tests = success + format-check = success 全绿�
 git show origin/<branch>:<file>` 核验**远端提交内容**——本地 HEAD 正确不代表
 远端正确（本事故中本地一直是对的）；③"内容修复"与"git mv"两个操作后，
 凡再改文件必须显式 add。
+
+## Attempt PR-CI5: 新版 skill 双核查合规审计与修复（2026-11-11，#2004 教训条款）
+
+**分类**：交付测试能力一致性核查（新版 skill Phase 3 两条强制 push 前核查）
+**审计结论**：
+- 核查 1（CI 收集机制）：✅ 合规——实现文件带 __main__ 冒烟入口
+  （[SMOKE_PASS]+Test Passed!）、测试文件结尾 Kernel Output Match!、
+  push 前 NPU 双路径实跑命中判定串、CI 实证全绿（0bcfbd2f）
+- 核查 2（交付测试能力与描述一致性）：❌ **一处缺口**——交付版
+  check_output 相对开发套件 check_precision 缺两项能力：①非有限位置
+  **NaN/Inf 模式逐一比对**（仅有 isfinite 掩码相等——NaN 冒充 Inf 位置的
+  golden 可通过，恰为 #2004 点名的弱化形态）；②全非有限 golden 的
+  empty-tensor guard（原版 abs_err.max() 会崩）
+**修复**：check_output 升级至与 check_precision 语义同构（保留原 isfinite
+  掩码双向相等 + 增补 isnan/isinf 模式比对 + empty guard）；本地 5 用例
+  语义自检（同构 Inf 通过/NaN-vs-Inf 拦截/全非有限通过/有限位 Inf 数值门
+  拦截/有限数据数值门回归）；NPU 双路径复验全绿（精度逐位不变）。
+**提交纪律**（PR-CI4 教训落实）：显式 git add → 暂存区核验 → amend →
+  push → **远端提交内容终验**（git show origin/ 确认模式比对代码在远端）→
+  184189da。CI 排队中（仓库级 runner 背压重现）。
