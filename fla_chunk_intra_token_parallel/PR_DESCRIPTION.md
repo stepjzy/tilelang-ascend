@@ -1,12 +1,12 @@
-为 Ascend NPU 新增 `fla_chunk_intra_token_parallel`（KDA intra-chunk 每 token 衰减内积 Aqk/Akk 生成）算子，迁移自 tile-ai/tilelang 的 `examples/kda/FLA_KDA/fla_chunk_intra_token_parallel.py`（Triton/FLA）与 `examples/kda/chunk_intra_token_parallel.py`（TileLang CUDA）。
+为 Ascend NPU 新增 `fla_chunk_intra_token_parallel`（KDA intra-chunk 每 token 衰减内积 Aqk/Akk 生成）算子，迁移自 tile-ai/tilelang 的 `examples/kda/FLA_KDA/fla_chunk_intra_token_parallel.py`（Triton/FLA）与 `examples/kda/chunk_intra_token_parallel.py`（TileLang CUDA）。交付文件镜像上游来源路径合入：`examples_experiment/kda/FLA_KDA/fla_chunk_intra_token_parallel.py`（kernel + smoke 入口）与 `examples_experiment/kda/FLA_KDA/test_fla_chunk_intra_token_parallel.py`（PyTorch golden + 代表性用例）。
 
 - **Kernel 架构**：单个 `@tilelang.jit` kernel（`out_idx=[-2, -1]`，`workspace_idx=[4, 5, 6]` 自动注入 3 个 fp32 GM 中转缓冲）；Developer 模式；`pass_configs` 开启 `AUTO_CV_COMBINE / AUTO_CV_SYNC / AUTO_SYNC / MEMORY_PLANNING`。一维 `T.Kernel(CORE_EFF)` 固定核网格（CORE_EFF = min(20, 任务数)），`(cid, vid)` 绑定将每个任务的向量工作分配到核对的 2 个 AIV 子块。
 - **计算结构**：对 chunk（CS=64）内每个 subchunk（SCS=16）的 token i 与前序 token j（j ≤ i，含自身）计算 `kgj = k_j · 2^(g_i - g_j)`，`Aqk[i, j%CS] = Σ_d q_i·kgj`，`Akk[i, j-i_ts] = (j<i) ? Σ_d (β_i·k_i)·kgj : 0`。衰减用中锚点因式分解 `2^(g_i-g_j) = E+_i · E-_j`（E± = exp(±(g-anchor))），每 head 一次性构造 Q'=q·E+、K'=k·E-、K''=k·E+ 三个 [16, DK] slab；点积整体卸载到 Cube 核：`Aqk = tril(Q' @ K'^T)`、`Akk = strict_tril((β·K'') @ K'^T)`，按 4-head 组块对角批量一次 gemm_v0（transpose_B），取 [32,16] 对角块。V 侧用 compare+select（VSEL）做下三角掩码——深衰减下块对角垃圾单元可达 ±inf（累加器中 E+·E- 至 2^180），乘法掩码会产生 inf·0=NaN，select 直接替换为 0，与 golden 的 masked_fill 语义一致。
-- **数据流与内存管理**：V（AIV）构造 fp32 操作数 A=[Q';K''][128,DK]、B=K'[64,DK] → GM workspace 双缓冲槽（NSLOT=2，按核 ping-pong，常驻 L2）→ C（AIC）经 L1 全 slab 中转 → L0A/L0B → mma → 双槽 L0C（偶/奇 head 组分槽，稳态下 mma(g1) 与 fixpipe(g0) 重叠）→ GM o_relay → V 掩码+CAST_RINT+写回 GM。操作数强制 fp32：bf16 舍入单独就会使 Akk matched_ratio 降到 0.9848（< 0.99 门限，CPU 模拟实测），且与 split-bf16 中转字节数相同。UB 峰值 ~174KB/196KB：drain 暂存采用单 head [16,*] 缓冲逐 head 复用（整任务布局需 30KB，单 head 仅 7.5KB）。
-- **关键优化策略**（基线 19150us → 最终 1739us，11.0×）：① subchunk 并行任务划分 + 静态循环 + 宏展开（消除每 block 816 次条件 barrier）；② 衰减因式分解（Exp 指令 -87%）；③ 点积从 Vector 管线卸载到全程空闲的 20 个 Cube 核（-49.2%）——迁移初期 msprof 显示 AIV 满载 97.98% 而 Cube 全程空转、29% 时间耗在比乘法慢 5.3× 的行广播指令上；④ 固定核网格 + 2 任务延迟软件流水 + 双缓冲 relay（V drain(t-2)/produce(t) 与 C gemm(t) 稳态三路重叠，AIC busy 99.55%，-39.5%）；⑤ β 折叠向量化（one-hot select + 行归约 + 列广播，替代每任务 64 次标量读写，-18.8%）。跨核同步混合自动/手动：操作数 relay 保留 AUTO_CV_SYNC（pass 按 "workspace" 字面名识别），结果 relay 改手动 FIX flag（交替事件 ID，配对 2 任务延迟的 drain）。
-- **数值精度处理**：fp32 计算域全程（E±/Q'/K'/K''/gemm 操作数/累加器），输出经 staging + CAST_RINT 整块转 bf16；`exp2(x)` 实现为 `exp(x·ln2)`（exp2 无 Ascend 后端映射）。因式分解的域限制已文档化：subchunk 半程衰减 |g_i - g_anchor| < ~127（log2 域，fp32 上限余量 31）。
-- **硬件与实现约束**：定长序列（S % CS == 0、CS % SCS == 0、H % 2 == 0 且 BH 自适应 8→4→2、DK % 16 == 0 且 DK ≥ 32、BH·SCS ≥ 16 的 gemm N 分形下界）；输入 q/k/beta bf16 + gk fp32，输出 bf16；varlen 不在范围。
-- **测试验证**：分层套件 30 用例（L0 规则 shape 3 + L1 泛化 9 [含 H=2/6/12 头组自适应、DK=48 非 2 幂、SCS=8 非默认] + L2 非法输入拒绝 10 + Boundary 深衰减/inf/nan 4），PyTorch golden 对照，全部通过（golden 另经三重循环朴素转写交叉校验）。本示例文件含 2 个代表性用例（bench 结构 L0 + 多 batch L1）。
+- **数据流与内存管理**：V（AIV）构造 fp32 操作数 A=[Q';K''][128,DK]、B=K'[64,DK] → GM workspace 双缓冲槽（NSLOT=2，按核 ping-pong，常驻 L2）→ C（AIC）按 head 组从 relay 槽装载 L1，经高层 T.gemm_v0（transpose_B）在 L0C 累加后暂存至 GM o_relay → V 掩码+CAST_RINT+写回 GM。操作数强制 fp32：bf16 舍入单独就会使 Akk matched_ratio 降到 0.9848（< 0.99 门限，CPU 模拟实测），且与 split-bf16 中转字节数相同。UB 峰值 ~174KB/192KB：drain 暂存采用单 head [16,*] 缓冲逐 head 复用（整任务布局需 30KB，单 head 仅 7.5KB）。
+- **关键优化策略**（基线 19150us → 终版 1762us，10.9×；调优峰值 1739us）：① subchunk 并行任务划分 + 静态循环 + 宏展开（消除每 block 816 次条件 barrier）；② 衰减因式分解（Exp 指令 -87%）；③ 点积从 Vector 管线卸载到全程空闲的 20 个 Cube 核（-49.2%）——迁移初期 msprof 显示 AIV 满载 97.98% 而 Cube 全程空转、29% 时间耗在比乘法慢 5.3× 的行广播指令上；④ 固定核网格 + 2 任务延迟软件流水 + 双缓冲 relay（V drain(t-2)/produce(t) 与 C gemm(t) 稳态三路重叠，AIC busy 99.55%，-39.5%）；⑤ β 折叠向量化（one-hot select + 行归约 + 列广播，替代每任务 64 次标量读写，-18.8%）。跨核同步混合自动/手动：操作数 relay 保留 AUTO_CV_SYNC（pass 按 "workspace" 字面名识别），结果 relay 改手动 FIX flag（交替事件 ID，配对 2 任务延迟的 drain）。
+- **数值精度处理**：fp32 计算域全程（E±/Q'/K'/K''/gemm 操作数/累加器），输出经 staging + CAST_RINT 整块转 bf16；`exp2(x)` 实现为 `exp(x·ln2)`（exp2 无 Ascend 后端映射），且 anchor 减法在原始 log2 域先于 ln2 缩放进行——大 |g| 下先乘后减会把相邻 gate 舍入为同值丢失衰减差值。因式分解的域限制已文档化：subchunk 半程衰减 |g_i - g_anchor| < ~127（log2 域，fp32 上限余量 31）。
+- **硬件与实现约束**：定长序列（S % CS == 0、CS % SCS == 0 且 CS/SCS 为 2 的幂、H % 2 == 0 且 BH 自适应 8→4→2、DK % 16 == 0 且 32 ≤ DK ≤ 128（BH=8 主路径的 192KB UB 共存上限，超界干净拒绝）、BH·SCS ≥ 16 的 gemm N 分形下界且 GGRP 整除 BH）；输入 q/k/beta bf16 + gk fp32，输出 bf16；varlen 不在范围。
+- **测试验证**：分层套件 30 用例（L0 规则 shape 3 + L1 泛化 9 [含 H=2/6/12 头组自适应、DK=48 非 2 幂、SCS=8 非默认] + L2 非法输入拒绝 10 + Boundary 深衰减/inf/nan 4），PyTorch golden 对照，全部通过（golden 另经三重循环朴素转写交叉校验）。交付测试文件含 3 个代表性用例（bench 结构 L0、多 batch L1、深衰减 gate 哨兵 L1）+ 2 个域拒绝检查（DK=256 超预算、CS/SCS 非 2 幂）。
 
 ## 精度验证 ✅
 
@@ -31,12 +31,12 @@
 
 | **性能指标** | **测试结果** |
 | --- | --- |
-| Kernel 执行时间（torch.npu 事件计时，20 次预热后 10 次重复取均值） | **1739.2 μs**（独立复核 1737.8 μs） |
-| 30 次 back-to-back 循环均值 | 1693.3 μs |
+| Kernel 执行时间（torch.npu 事件计时，20 次预热后 10 次重复取均值） | **1762.4 μs**（稳态 per-rep 1690-1710） |
+| 30 次 back-to-back 循环均值 | 1715.8 μs |
 | Block Dim | 固定核网格 20（每核 2 AIV 子块） |
-| 有效内存带宽 | 357 GB/s |
+| 有效内存带宽 | 353 GB/s |
 
-> 计时仅覆盖设备侧 kernel 执行（不含张量构造、H2D/D2H、JIT 编译与框架调度开销）。首次迁移可运行版本为 19150 μs，经结构重组与流水化后为 1739 μs（-90.9%）。
+> 计时仅覆盖设备侧 kernel 执行（不含张量构造、H2D/D2H、JIT 编译与框架调度开销）。首次迁移可运行版本为 19150 μs，经结构重组与流水化后为 1762 μs（-90.8%；调优峰值为 1739 μs，终版为采用高层 T.gemm_v0 intrinsic 的 DSL 清晰性支付了 +1.3%）。
 
 ---
 
@@ -95,3 +95,6 @@ DK=256 从"自动降档可跑"变为"干净拒绝"（对应首轮 committer 意�
 与 fla_chunk_o #1953 的同类教训，趁未合并先行纠正）。同时删除修复轮次叠加残留的
 重复 `__main__` smoke 块。镜像路径版在 NPU 环境全量验证通过（3 用例 + 哨兵
 0.125 + DK=256/pow2 拒绝，EXIT=0）。
+
+> 注（2026-11-11）：正文主体已同步终版口径（3d44a092）——交付路径、gemm_v0 数据流、
+> 硬域门约束、终版性能数字与测试形态；修订记录 I-IV 为历史决策留档，不随终版改写。
