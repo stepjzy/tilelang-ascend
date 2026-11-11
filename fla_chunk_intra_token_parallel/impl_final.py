@@ -563,34 +563,7 @@ if __name__ == "__main__":
     # Smoke entry (the CI legacy runner executes this file with `python`):
     # minimal fixed-length shape, output-shape/finite checks, "Test Passed!"
     # on success. Numerical accuracy is covered by
-    # test_example_fla_chunk_intra_token_parallel.py (PyTorch golden).
-    import torch_npu  # noqa: F401  (registers .npu() on torch)
-
-    tilelang.cache.clear_cache()
-    B, S, H, DK, CS, SCS = 1, 64, 8, 64, 64, 16
-
-    gen = torch.Generator().manual_seed(42)
-    q = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
-    k = torch.randn(B, S, H, DK, generator=gen).to(torch.bfloat16)
-    beta = torch.randn(B, S, H, generator=gen).to(torch.bfloat16)
-    gk = torch.nn.functional.logsigmoid(torch.randn(B, S, H, DK, generator=gen, dtype=torch.float32))
-    gk = gk.view(B, S // CS, CS, H, DK).cumsum(dim=2).view(B, S, H, DK)
-
-    aqk, akk = fla_chunk_intra_token_parallel(q.npu(), k.npu(), gk.npu(), beta.npu())
-    torch.npu.synchronize()
-    assert aqk.shape == (B, S, H, CS) and aqk.dtype is torch.bfloat16
-    assert akk.shape == (B, S, H, SCS) and akk.dtype is torch.bfloat16
-    for name, out in (("Aqk", aqk), ("Akk", akk)):
-        assert torch.isfinite(out.float()).all().item(), f"{name} contains NaN/Inf"
-    print(f"[SMOKE_PASS] fla_chunk_intra_token_parallel B={B} S={S} H={H} DK={DK} chunk={CS} sub_chunk={SCS} bf16")
-    print("Test Passed!")
-
-
-if __name__ == "__main__":
-    # Smoke entry (the CI legacy runner executes this file with `python`):
-    # minimal fixed-length shape, output-shape/finite checks, "Test Passed!"
-    # on success. Numerical accuracy is covered by
-    # test_example_fla_chunk_intra_token_parallel.py (PyTorch golden).
+    # test_fla_chunk_intra_token_parallel.py (PyTorch golden).
     import torch_npu  # noqa: F401  (registers .npu() on torch)
 
     tilelang.cache.clear_cache()

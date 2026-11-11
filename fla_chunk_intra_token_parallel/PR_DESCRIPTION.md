@@ -83,3 +83,15 @@ example 的惯例改为**单一事实的硬域门**：`DK <= 128`（BH=8 主路�
 DK=256 从"自动降档可跑"变为"干净拒绝"（对应首轮 committer 意见②给出的两个合法处置之一：
 "提前拒绝"分支）。超出域门的 shape 仍由 MEMORY_PLANNING pass 在编译期硬失败兜底。
 净 -47 行；bench 路径零变化（BH=8、GGRP=4）。验证：3 正向用例 + DK=256/CS=48 拒绝全过。
+
+---
+
+## Review 修订记录 IV（镜像路径交付 + 去重，2026-11-11，交付 3d44a092）
+
+按 op-migration skill 2026-11 裁定的"交付路径镜像规则"调整：来源
+`examples/kda/FLA_KDA/fla_chunk_intra_token_parallel.py` → 合入
+`examples_experiment/kda/FLA_KDA/fla_chunk_intra_token_parallel.py`（源文件基名，
+无 example_ 前缀；此前误入共享沙箱目录 dsa_sparse_finetune/ + example_ 前缀——
+与 fla_chunk_o #1953 的同类教训，趁未合并先行纠正）。同时删除修复轮次叠加残留的
+重复 `__main__` smoke 块。镜像路径版在 NPU 环境全量验证通过（3 用例 + 哨兵
+0.125 + DK=256/pow2 拒绝，EXIT=0）。
