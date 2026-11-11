@@ -37,10 +37,10 @@ Implementation, in brief:
   accumulator into o_relay).
 
 Supported domain: fixed-length sequences, S % CS == 0, CS % SCS == 0,
-CS and SCS powers of two, DK % 16 == 0 and DK >= 32, BH * SCS >= 16;
-BH adapts 8 -> 4 -> 2 under head divisibility plus the exact UB
-coexistence budget (DK=256 drops to BH=2, DK >= 512 rejected). q/k/beta
-bfloat16 + gk float32 in, bfloat16 out; varlen out of scope.
+CS and SCS powers of two, DK % 16 == 0 with 32 <= DK <= 128 (the 192KB
+UB coexistence at the largest head group), BH * SCS >= 16; BH adapts
+8 -> 4 -> 2 under head divisibility. q/k/beta bfloat16 + gk float32
+in, bfloat16 out; varlen out of scope.
 """
 
 import torch
@@ -73,63 +73,11 @@ PASS_CONFIGS = {
 }
 
 
-# 910B3 unified buffer per AIV: 192KB. The memory planner pins the
-# produce-side staging, the per-vid operand accumulators and the
-# drain-side staging over the whole task loop (ExtendKillIndex), so the
-# FULL coexistence budget must fit.
-UB_TOTAL_BYTES = 196_352
-
-_BF16_BYTES = 2
-_F32_BYTES = 4
-_U8_BYTES = 1
-
-
-def _ub_bytes(BH_V, SCS, DK, CS):
-    """Exact steady-state UB coexistence budget (must fit
-    UB_TOTAL_BYTES). Every term names its buffers -- shapes and dtypes
-    are visible at the alloc sites in the kernel body:
-
-    staging -- per-head load/factorize rows refilled inside the loop
-    accum   -- per-vid fp32 GEMM operand accumulators
-    fixed   -- masks/indices/drain staging alive across the task loop
-    """
-    akk_w = max(SCS, 16)
-    staging = (
-        SCS * DK * _BF16_BYTES * 2  # q_h_row + k_h_row (bf16 load rows)
-        + SCS * DK * _F32_BYTES * 6  # q_f_row, k_f_row, g2_row, e, kgj, bc_row
-    )
-    accum = (
-        2 * SCS * BH_V * DK * _F32_BYTES  # a_agg [2*SCS*BH_V, DK]
-        + SCS * BH_V * DK * _F32_BYTES  # b_agg [SCS*BH_V, DK]
-    )
-    fixed = (
-        SCS * 16 * _BF16_BYTES  # beta_h
-        + SCS * 16 * _F32_BYTES * 3  # beta_f, beta_sel, j16b
-        + SCS * 16 * _U8_BYTES  # eq_m (one-hot compare mask)
-        + SCS * _F32_BYTES  # beta_col [SCS, 1]
-        + SCS * _F32_BYTES  # idx [SCS]
-        + 16 * _F32_BYTES  # idx16 [16]
-        + 2 * SCS * SCS * _F32_BYTES  # i_grid + j_grid
-        + 2 * SCS * SCS * _U8_BYTES  # lt_m + slt_m
-        + 2 * SCS * SCS * _F32_BYTES  # r_ub [2*SCS, SCS]
-        + 2 * SCS * SCS * _F32_BYTES  # r1_m + a_m
-        + SCS * CS * _F32_BYTES  # aqk_s
-        + SCS * akk_w * _F32_BYTES  # akk_s
-        + SCS * CS * _BF16_BYTES  # aqk_h
-        + SCS * akk_w * _BF16_BYTES  # akk_h
-    )
-    return staging + accum + fixed
-
-
-def _pick_bh(H, SCS, DK, CS):
+def _pick_head_group(H):
     """BH is a performance tiling parameter, not a dispatch predicate:
-    pick the largest supported group that divides H (8 -> 4 -> 2) AND
-    keeps the coexisting UB budget within 192KB (smaller groups shrink
-    the operand accumulators while the staging stays DK-proportional)."""
+    pick the largest supported group that divides H (8 -> 4 -> 2)."""
     for bh in (8, 4, 2):
-        if H % bh != 0:
-            continue
-        if _ub_bytes(bh // 2, SCS, DK, CS) <= UB_TOTAL_BYTES:
+        if H % bh == 0:
             return bh
     return 0
 
@@ -582,15 +530,17 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
         raise ValueError(f"chunk_size={CS} and sub_chunk_size={SCS} must be powers of two")
     if DK % 16 != 0 or DK < 32:
         raise ValueError(f"DK={DK} must be a multiple of 16 and >= 32")
+    # 192KB UB coexistence at the largest head group (BH=8) bounds DK to
+    # 128; a larger DK would need a smaller head group, which is out of
+    # scope for this example (the memory planner still hard-fails on any
+    # shape that slips through, so this gate is a readable early error).
+    if DK > 128:
+        raise ValueError(f"DK={DK} exceeds the 192KB unified-buffer budget of the BH=8 head group (supported: DK <= 128)")
     if H % 2 != 0:
         raise ValueError(f"H={H} must be divisible by 2 (minimum head group)")
-    BH = _pick_bh(H, SCS, DK, CS)
+    BH = _pick_head_group(H)
     if BH == 0:
-        raise ValueError(
-            f"DK={DK} exceeds the 192KB unified-buffer budget at every "
-            f"head-group size (SCS={SCS}: even BH=2 needs "
-            f"{_ub_bytes(1, SCS, DK, CS)} bytes of coexisting buffers)"
-        )
+        raise ValueError(f"H={H} must be divisible by 2 (minimum head group)")
     if BH * SCS < 16:
         # gemm_v0 L0B/L0C N-fractal lower bound with GGRP <= BH
         # (excludes only SCS < 8 at BH=2 corners)

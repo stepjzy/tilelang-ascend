@@ -72,3 +72,14 @@ CS=48 拒绝检查；smoke 入口（d3ca89c6 的 CI legacy runner 需求）并�
    附带修正 GGRP 槽预算对齐 gemm_v0 模板真实规则（L0A/L0B 槽按 M x 128 固定
    分配、K>128 槽减半；DK=32 时 GGRP 从 8 回到 4，消除 static_assert 编译拒绝）。
    精度复验：4 用例 + 2 域拒绝全过（deep-gate 哨兵 0.125 bit 级、DK=256 GGRP=2）。
+
+---
+
+## Review 修订记录 III（魔鬼数字简化为硬域门，2026-11-10，交付 882948a1）
+
+LLMZhangYC 意见②的最终形态：逐缓冲预算公式（修订 II 的具名版）仍存在"kernel alloc 声明与
+host 公式两处独立事实"的漂移风险，且该公式仅为"BH 自动降档 + 可读报错"服务——按仓库其他
+example 的惯例改为**单一事实的硬域门**：`DK <= 128`（BH=8 主路径的 192KB UB 共存上限），
+DK=256 从"自动降档可跑"变为"干净拒绝"（对应首轮 committer 意见②给出的两个合法处置之一：
+"提前拒绝"分支）。超出域门的 shape 仍由 MEMORY_PLANNING pass 在编译期硬失败兜底。
+净 -47 行；bench 路径零变化（BH=8、GGRP=4）。验证：3 正向用例 + DK=256/CS=48 拒绝全过。
