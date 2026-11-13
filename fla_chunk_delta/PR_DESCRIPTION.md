@@ -2,11 +2,11 @@
 
 - **Kernel 架构**：`@tilelang.jit` 装饰的前向/反向两个主 kernel（`T.Kernel(threads=2)`，Block Dim 20 / Mix Block Dim 40）+ 各自配套的 `threads=1` 门控预计算 kernel（Block Dim 20 / Mix 20）。Developer 模式（`alloc_shared`/`alloc_fragment` + 自动同步），主 kernel 采用 fixed-core 任务循环：B×H×NV 条递推链 striped 分配到 20 个 AI Core，核内 `T.serial` 逐 chunk 递推，2 链满批 + 受卫单链尾批。
 - **计算结构**：每条链维护 fp32 状态 `H`/`dH` ∈ R^{DK×DV}，按 chunk（BT=64）串行递推。前向：先存当前状态快照 `h[t]`，`v_new = u − w @ H`，经 token 标量门控 `exp(g_last − g)` 与 per-channel 衰减 `exp(gk_last)` 更新后执行 `H += k^T @ v_new`；反向按 chunk 逆序：`dv2 = dv + (k @ dH) ⊙ exp(g_last − g)`，`dH = D·dH + (q̃^T @ do)·scale − w^T @ dv2`。`USE_G`/`USE_GK`/`USE_INITIAL_STATE`/`STORE_FINAL_STATE`/`SAVE_NEW_VALUE`/`USE_EXP2` 均为编译期分支。
-- **数据流与内存管理**：门控量（`exp(g_last − g)`、衰减 tile、`q̃ = q·exp(g)`）在 prep kernel 中预计算为整 tile（fp32，硬件 transpose + 行广播展开），主 kernel 只消费不重算；GM → UB/L1 → L0 的搬运全部经 `T.copy`/`T.gemm_v0` 合法路径；递推状态常驻 UB（fp32，ping-pong），跨核链间交换经 L2 上的 relay workspace（16 槽 ring）；K 维按 64 行 slab 合并 GEMM（前向每 chunk 2 次、反向 3 次 gemm_v0，半精度操作数）。
-- **关键优化策略**：① 门控预计算 kernel 消除主 kernel 内每 chunk 192 次标量迭代（前向 -62%）；② relay ring 化（NSLOT=16）+ MTE3 队列排序，让中继写提前于 HBM 快照写；③ 满批分解消除 Select 风暴（每迭代 90+ 标量分支清零，反向 -13.8%）；④ `q̃` 外移至 prep（主 kernel 每链每 chunk 少 13 条 Vector 语句与 2 次中继握手，反向再 -7.5%）；⑤ 前向单链 + BV=128 全值宽；⑥ 反向 `q̃^T@do` 与 `w^T@dv2` 共享 readback、L0C 分时复用。
+- **数据流与内存管理**：门控量（`exp(g_last − g)`、衰减 tile、`q̃ = q·exp(g)`）在 prep kernel 中预计算为整 tile（fp32，硬件 transpose + 行广播展开），主 kernel 只消费不重算；GM → UB/L1 → L0 的搬运全部经 `T.copy`/`T.gemm_v0` 合法路径；递推状态常驻 UB（fp32；反向 2 链批处理配 A/B 双状态缓冲），跨核链间交换经 L2 上的 relay workspace（16 槽 ring）；K 维按 64 行 slab 合并 GEMM（前向每 chunk 2 次、反向 3 次 gemm_v0，半精度操作数）。
+- **关键优化策略**：① 门控预计算 kernel 消除主 kernel 内每 chunk 192 次标量迭代（前向 7020.5 → 4219.4 μs，-39.9%；反向同幅 -36.9%）；② relay ring 化（NSLOT=16，跨链 WAR 解耦的使能结构，单独实测约持平）+ MTE3 队列排序让中继写提前于 HBM 快照写（前向再 -11.1%）；③ 链批结构 + 源码序重排（2 链满批 + 受卫单链尾批，消除每迭代 90+ 条标量分支的 Select 风暴）：前向 -29.6%、反向 -13.8%；④ `q̃` 外移至 prep（主 kernel 每链每 chunk 少 13 条 Vector 语句与 2 次中继握手，反向再 -7.5%）；⑤ 前向单链 + BV=128 全值宽（实测与 BV=64 持平，为更大 DV 与值域余量保留）；⑥ 反向 `q̃^T@do` 与 `w^T@dv2` 共享 readback、L0C 分时复用。
 - **数值精度处理**：递推状态全程 fp32；per-chunk 衰减积 `exp(g_last)·exp(gk_last)` 合并为单次 `exp(g_last + gk_last)`（相对差 ~1 ulp，远小于输出量化步长）；输出按上游语义在 GEMM 前降至 fp16/bf16（`v_new`、`q̃` 的 cast 点与上游 Triton 实现逐位对齐）；`ht`/`dh0` 保持 fp32。
-- **硬件与实现约束**：定长序列（S % 64 == 0）、DK/DV 为 64 的倍数且 DK ≤ 256、chunk_size=64；fwd 输入 fp16、bwd 输入 bf16（`g`/`gk` 恒 fp32）；threads=2 下 gather/broadcast 不可用（vid 分裂），标量门控链全部走预计算整 tile 路径。
-- **测试验证**：PyTorch fp64 重写参考实现为 golden（独立 token 级递推对拍 0 diff）；L0 门槛 6 用例 + L1 功能 10（尾批/参数分支/值域）+ L2 负向 10（非法 shape/dtype 正确拒绝）+ Boundary 5（零输入/exp 下溢/inf/nan 结构/值域边界），覆盖门禁 23 维全 PASS；算子文件自带 CI smoke 入口（L0 门 shape 的 fwd/bwd 全 wrapper 调用与 shape/finite 检查，输出 `[SMOKE_PASS]`/`Test Passed!`，对齐 bench_test.sh 判定口径）。
+- **硬件与实现约束**：定长序列（S % 64 == 0）、DK ∈ {64, 128}（192/256 属上游声明域但本实现直接拒绝，有负向测试锁定）、DV 为 64 的倍数、H ≤ 248（prep 门控/衰减 staging 行上限）、chunk_size=64；fwd 输入 fp16、bwd 输入 bf16（`g`/`gk` 恒 fp32）；threads=2 下 gather/broadcast 不可用（vid 分裂），标量门控链全部走预计算整 tile 路径。
+- **测试验证**：PyTorch fp64 重写参考实现为 golden（独立 token 级递推对拍 0 diff）；L0 门槛 6 用例 + L1 功能 10（尾批/参数分支/值域）+ L2 负向 10（非法 shape/dtype 正确拒绝，含 DK=96/256、DV=100、S 不整除、非法 dtype）+ Boundary 5（零输入/exp 下溢/inf/nan 结构/值域边界），31 个用例覆盖全部编译期分支与三档 dtype 容差；算子文件自带 CI smoke 入口（L0 门 shape 的 fwd/bwd 全 wrapper 调用与 shape/dtype/finite 检查，输出 `[SMOKE_PASS]`/`Test Passed!`，对齐 bench_test.sh 判定口径）。
 
 ## 精度验证 ✅
 
@@ -50,7 +50,7 @@
 | Ascend NPU（本次 PR） | **6077.3 μs**（fwd+bwd 合计，实测） | — |
 | 性能目标 | 3400 μs（fwd+bwd 合计） | **1.79×** |
 
-实测值未达目标，差距的构成已用 msprof 管线画像定位（终态轮画像随归档留存）：
+实测值未达目标，差距的构成已用 msprof 管线画像定位：
 
 - **串行递推的跨核往返等待是主要构成**：chunk 状态链式依赖使每链每 chunk 必需
   2-2.5 次跨核同步往返（实测 ~2.2-2.4 μs/次）；终态画像中 AIC/AIV 双侧各有
