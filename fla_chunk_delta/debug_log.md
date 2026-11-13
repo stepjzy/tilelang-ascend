@@ -287,3 +287,24 @@ already latency-bound kernel -- analysis).
    transposed gate staging (gt_t rows) feeds row_expand directly per head; the
    two-step UB cast chain keeps the golden's quantization point bit-identical
    (bf16 -> fp32 -> fp32 row-gate -> bf16).
+
+---
+
+## 交付后修正（2026-11-13）：CI smoke main 补齐
+
+- 分类：交付缺陷（非 kernel 缺陷）
+- 现象：用户指出 fla_chunk_delta.py 无 `__main__` 入口且未登记
+  ci/operator_test_manifest.yaml——examples/bench_test.sh 全量收集
+  examples_experiment/**/*.py 后按 "TEST PASSED!/KERNEL OUTPUT MATCH"
+  判定，无 main 的算子文件被判 [FAILED]，CI 会挂。
+- 修正：对齐已合入先例（example_fla_chunk_o.py：smoke main + 不登记
+  manifest——登记需改 ci/operator_test_manifest.yaml，违反"PR 只放 ≤2
+  交付文件"约束），补 L0 门 shape 的 smoke main（fwd fp16 + bwd bf16 全
+  wrapper 调用，shape/dtype/finite 断言，[SMOKE_PASS]/Test Passed! 输出）。
+- 踩坑：首版 smoke 把 fwd 域 fp16 的 k/w 直接喂给 bwd（bf16 域），Cython
+  wrapper 报 "Buffer dtype mismatch for parameter K3: expected
+  torch.bfloat16, got torch.float16"——两域输入必须分开构造
+  （kb/wb = k/w.to(bfloat16)）。
+- 验证：CI 同构执行（cd <dir> && python fla_chunk_delta.py）job
+  01a1d28c：[SMOKE_PASS] + Test Passed!，exit 0；ruff format/check 双过。
+- 交付分支 amend + --force-with-lease：77b06195 → e7df98af。

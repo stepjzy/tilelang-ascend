@@ -893,3 +893,47 @@ __all__ = [
     "fla_chunk_delta_prep_kernel",
     "PASS_CONFIGS",
 ]
+
+
+if __name__ == "__main__":
+    # Smoke entry (the CI legacy runner executes this file with `python`):
+    # L0-gate shape, output-shape/finite checks, "Test Passed!" on success.
+    # Numerical accuracy is covered by test_fla_chunk_delta.py
+    # (PyTorch golden).
+    import torch_npu  # noqa: F401  (registers .npu() on torch)
+
+    tilelang.cache.clear_cache()
+    B, S, H, DK, DV, CS = 1, 128, 2, 64, 64, 64
+    NT = S // CS
+
+    gen = torch.Generator().manual_seed(42)
+    k = torch.randn(B, S, H, DK, generator=gen)
+    w = torch.randn(B, S, H, DK, generator=gen)
+    u = torch.randn(B, S, H, DV, generator=gen)
+    q = torch.randn(B, S, H, DK, generator=gen)
+    do = torch.randn(B, S, H, DV, generator=gen)
+    dv = torch.randn(B, S, H, DV, generator=gen)
+    # mild negative log decays: bounded gates keep the recurrence finite
+    g = -torch.rand(B, S, H, generator=gen)
+    gk = -torch.rand(B, S, H, DK, generator=gen)
+    # fwd domain fp16; bwd domain bf16 (upstream benchmark convention)
+    k, w, u = (t.to(torch.float16) for t in (k, w, u))
+    q, do, dv = (t.to(torch.bfloat16) for t in (q, do, dv))
+    kb, wb = k.to(torch.bfloat16), w.to(torch.bfloat16)
+
+    h, v_new, ht = fla_chunk_delta_fwd(k.npu(), w.npu(), u.npu(), g.npu(), gk.npu())
+    torch.npu.synchronize()
+    assert h.shape == (B, NT, H, DK, DV) and h.dtype is torch.float16
+    assert v_new.shape == (B, S, H, DV) and v_new.dtype is torch.float16
+    assert ht is None
+
+    dh, dh0, dv2 = fla_chunk_delta_bwd(q.npu(), kb.npu(), wb.npu(), do.npu(), dv.npu(), g.npu(), gk.npu())
+    torch.npu.synchronize()
+    assert dh.shape == (B, NT, H, DK, DV) and dh.dtype is torch.bfloat16
+    assert dv2.shape == (B, S, H, DV) and dv2.dtype is torch.bfloat16
+    assert dh0 is None
+
+    for name, out in (("h", h), ("v_new", v_new), ("dh", dh), ("dv2", dv2)):
+        assert torch.isfinite(out.float()).all().item(), f"{name} contains NaN/Inf"
+    print(f"[SMOKE_PASS] fla_chunk_delta B={B} S={S} H={H} DK={DK} DV={DV} chunk={CS} fwd fp16 + bwd bf16 (gates fp32)")
+    print("Test Passed!")

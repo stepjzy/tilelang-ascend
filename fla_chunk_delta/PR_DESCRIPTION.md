@@ -6,7 +6,7 @@
 - **关键优化策略**：① 门控预计算 kernel 消除主 kernel 内每 chunk 192 次标量迭代（前向 -62%）；② relay ring 化（NSLOT=16）+ MTE3 队列排序，让中继写提前于 HBM 快照写；③ 满批分解消除 Select 风暴（每迭代 90+ 标量分支清零，反向 -13.8%）；④ `q̃` 外移至 prep（主 kernel 每链每 chunk 少 13 条 Vector 语句与 2 次中继握手，反向再 -7.5%）；⑤ 前向单链 + BV=128 全值宽；⑥ 反向 `q̃^T@do` 与 `w^T@dv2` 共享 readback、L0C 分时复用。
 - **数值精度处理**：递推状态全程 fp32；per-chunk 衰减积 `exp(g_last)·exp(gk_last)` 合并为单次 `exp(g_last + gk_last)`（相对差 ~1 ulp，远小于输出量化步长）；输出按上游语义在 GEMM 前降至 fp16/bf16（`v_new`、`q̃` 的 cast 点与上游 Triton 实现逐位对齐）；`ht`/`dh0` 保持 fp32。
 - **硬件与实现约束**：定长序列（S % 64 == 0）、DK/DV 为 64 的倍数且 DK ≤ 256、chunk_size=64；fwd 输入 fp16、bwd 输入 bf16（`g`/`gk` 恒 fp32）；threads=2 下 gather/broadcast 不可用（vid 分裂），标量门控链全部走预计算整 tile 路径。
-- **测试验证**：PyTorch fp64 重写参考实现为 golden（独立 token 级递推对拍 0 diff）；L0 门槛 6 用例 + L1 功能 10（尾批/参数分支/值域）+ L2 负向 10（非法 shape/dtype 正确拒绝）+ Boundary 5（零输入/exp 下溢/inf/nan 结构/值域边界），覆盖门禁 23 维全 PASS。
+- **测试验证**：PyTorch fp64 重写参考实现为 golden（独立 token 级递推对拍 0 diff）；L0 门槛 6 用例 + L1 功能 10（尾批/参数分支/值域）+ L2 负向 10（非法 shape/dtype 正确拒绝）+ Boundary 5（零输入/exp 下溢/inf/nan 结构/值域边界），覆盖门禁 23 维全 PASS；算子文件自带 CI smoke 入口（L0 门 shape 的 fwd/bwd 全 wrapper 调用与 shape/finite 检查，输出 `[SMOKE_PASS]`/`Test Passed!`，对齐 bench_test.sh 判定口径）。
 
 ## 精度验证 ✅
 

@@ -43,7 +43,7 @@ golden 量化点契约如何反过来封锁 kernel 层优化空间。
 
 ## 交付物
 
-- 分支 `feat/fla-chunk-delta-pr`（origin，commit 77b06195）
+- 分支 `feat/fla-chunk-delta-pr`（origin，commit e7df98af，含 CI smoke main）
 - 合入路径：`examples_experiment/kda/FLA_KDA/{fla_chunk_delta,test_fla_chunk_delta}.py`
   （镜像来源 tile-ai/tilelang examples/kda/FLA_KDA/fla_chunk_delta.py）
 - PR：待用户创建（PR_DESCRIPTION.md 为正本文稿）
