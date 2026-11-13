@@ -1,0 +1,16 @@
+# 2026-11-12 终验：issue #1925 贴文代码原样运行（非改写版）
+# 环境：DevEnvC_DCbyi_npu（910B3, CANN 9.2.0, repo 463c234c）
+# 脚本：issue1925_noflags.py / issue1925_flags.py（与 issue 贴文逐字一致，flags 臂仅加两行 flag）
+===== NOFLAGS ARM =====
+rep0: max_abs_err=2.0144e+00 MISMATCH (stale)
+rep1: max_abs_err=3.2938e+00 MISMATCH (stale)
+rep2: max_abs_err=2.3400e+00 MISMATCH (stale)
+rep3: max_abs_err=2.8514e+00 MISMATCH (stale)
+rep4: max_abs_err=2.6062e+00 MISMATCH (stale)
+rep5: max_abs_err=2.6880e+00 MISMATCH (stale)
+rep6: max_abs_err=3.0627e+00 MISMATCH (stale)
+rep7: max_abs_err=2.8696e+00 MISMATCH (stale)
+rep8: max_abs_err=1.9841e+00 MISMATCH (stale)
+rep9: max_abs_err=2.3303e+00 MISMATCH (stale)
+===== FLAGS ARM =====
+rep0..rep9: max_abs_err=0.0000e+00 MATCH ×10

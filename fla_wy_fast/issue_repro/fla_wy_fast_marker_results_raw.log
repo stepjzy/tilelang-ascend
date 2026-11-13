@@ -1,0 +1,15 @@
+# 标记值实验（重建版）结果 — 2026-11-13, 910B3/CANN 9.2.0, repo 463c234c
+# kernel: GRID=16 blocks, 每块写标记 marker=cid*64+i → 跨步散列至 dbeta[bb, s0:s0+64, bh]
+# 期望: dbeta[bb,t,bh] == (bs*B*H+bb*H+bh)*64 + (t%64)
+
+ARM 1 (computed source, [64] acc):   mismatched=1023/1024  ← v1 复现
+ARM 2 (loaded source,   [64] acc):   mismatched=1023/1024  ← 对照组也全错!
+ARM 3 (loaded source,   [64,1] acc):  mismatched=960/1024   ← 仅 1 个 block 的 64 位置正确
+样例: (0,0,1)=0 (marker 0 错落), (0,1,0)=0.5 (ARM1 拿到了 half 缓冲的值——源都取错了)
+
+# 结论:
+1. 标记值实验技术本身有效——包括当场抓出实验者自己的 out_idx 索引 bug（返回张量形状
+   不对立即暴露），meta 证明其威力;
+2. 对照组(loaded)也失败 → 本最小形态无法归因到"现算源"(bug A)——最小复现未达成,
+   印证伞形草案"无法最小化"的判断; 跨步散列在最小形态下两种源都坏(silent 错误);
+3. 真实算子里的标记实验(开发期)仍是 bug A 的唯一有效证据(该 issue 未提交, 伞形第3条)。

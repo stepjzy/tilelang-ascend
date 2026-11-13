@@ -23,6 +23,9 @@
 5. `perf_tuning/fla_wy_fast_tuning.md` + `fla_wy_fast_impl_iter1_before.py`（30min）→
    被否决的 4 项（A cast hoist 中性 / scatter 移位负收益 / k2 CSE UB 溢出 / kg div 持平）
    差在哪；`optimization_log.md` 为逐项 RESULT 原始记录
+7. `issue_repro/`（20min，按需）→ issue 复检三件套 + 标记值实验：#1925 干净复现怎么
+   炼成的（对照组纪律），#1924 复现为何被证伪（广播陷阱），散列地址 bug 最小复现为何失败
+   （对照组同败→归因不成立）——脚本可直接重跑
 
 （本算子无独立 history_version/：唯一方案转折点是 Stage 3 调优前后，快照即
 `perf_tuning/fla_wy_fast_impl_iter1_before.py`。）
