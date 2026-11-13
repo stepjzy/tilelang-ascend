@@ -45,8 +45,9 @@
   内置维护注释，请勿重新引入）。
 - **测试验证**：分层测试套件（L0 门槛 2 用例 + L1 功能 9 用例含 scale/值域/
   非对齐 shape + L2 负向 13 用例 + Boundary 5 用例）；交付示例
-  `test_example_fla_chunk_inter.py` 取代表性 L0 最小门槛 shape 与 bench shape
-  两用例，PyTorch golden 对比，4 输出独立混合容差判定。
+  `test_fla_chunk_inter.py` 取代表性 L0 最小门槛 shape 与 bench shape 两用例
+  + 一个域外输入（S % 64 != 0）确定性拒绝检查，PyTorch golden 对比，
+  4 输出独立混合容差判定（含 golden 非有限位置 NaN/Inf 结构比对）。
 
 ## 精度验证 ✅
 

@@ -230,3 +230,26 @@ git show origin/<branch>:<file>` 核验**远端提交内容**——本地 HEAD �
 **提交纪律**（PR-CI4 教训落实）：显式 git add → 暂存区核验 → amend →
   push → **远端提交内容终验**（git show origin/ 确认模式比对代码在远端）→
   184189da。CI 排队中（仓库级 runner 背压重现）。
+
+## Attempt PR-CI6: 全量描述↔代码双向一致性审计（2026-11-12，用户指令）
+
+**分类**：PR 描述与交付代码一致性（skill #2004 双向条款全面审计）
+**审计方法**：线上 PR#1994 正文全文 ↔ 交付代码 @184189da 逐条 diff + grep 实证
+**发现并修复的出入（2 处）**：
+1. 正文"测试验证"节引用旧文件名 test_example_fla_chunk_inter.py ↔
+   交付已改名 test_fla_chunk_inter.py（命名镜像修正时正文未同步）——
+   journal 权威文稿已修正；**线上正文需用户同步更新**（一行）。
+2. 通过条件声明"L2 域外输入被 ValueError 确定性拒绝"，交付实现代码有该能力
+   （_check_shape 11 处 raise ValueError）但交付测试无可演示用例——按
+   #2004 精神补最小拒绝演示（S=65 try/except ValueError，静态核验 5 种域外
+   shape 全拒绝 + NPU 实跑"domain rejection: S=65 -> ValueError"通过）。
+**核验一致的全部条款（证据化）**：零 reduce_sum/broadcast（2 处命中均为禁用
+声明文本，代码 0 使用）；out_idx=[19..22]/workspace_idx=[8..18]/23 张量签名；
+PASS_CONFIGS 四件套；约束条款 S%64/DK%32/DV%16&&>=64/chunk=64/fp32/连续 与
+_check_shape 逐条对齐；check_output 结构比对与通过条件新条款对齐；冒烟入口
+判定串（[SMOKE_PASS]+Test Passed!）与测试结尾 Kernel Output Match!；精度/
+性能数字与归档实测一致；文风（无内部词汇/无目标对比/无状态字眼）；路径+
+文件名镜像；≤2 文件；ruff 双过；提交纪律全链（显式 add→暂存核验→amend→
+push→远端内容终验）。
+**结果**：1d30c897 推送（远端内容终验 ✓），NPU 双路径实跑全绿（精度逐位不变
++ domain rejection 通过）。CI 待跑（runner 网络此前不稳）。
