@@ -253,3 +253,15 @@ _check_shape 逐条对齐；check_output 结构比对与通过条件新条款对
 push→远端内容终验）。
 **结果**：1d30c897 推送（远端内容终验 ✓），NPU 双路径实跑全绿（精度逐位不变
 + domain rejection 通过）。CI 待跑（runner 网络此前不稳）。
+
+## Attempt PR-CI7: PR 正文移除 chunk_bwd_dqkwg.py 引用（2026-11-12，用户裁定方案 A）
+
+**背景**：用户质询 PR"测试配置"行的出处引用——澄清：迁移来源/镜像路径/golden
+锚点均为用户指定的 examples/kda/FLA_KDA/fla_chunk_inter.py；chunk_bwd_dqkwg.py
+（我发现的同算子上游 TileLang CUDA 版 + 唯一测试样例文件，其 main() 配置与
+用户验收基准逐项一致）仅作为性能测试配置出处被引用。用户裁定方案 A：正文
+只写配置本身，移除该文件引用。
+**处置**：journal PR_DESCRIPTION 测试配置行移除"（对齐上游
+examples/kda/chunk_bwd_dqkwg.py benchmark 入口）"；计时口径说明保留
+"上游 KDA 示例 do_bench"泛指（不点名具体文件，事实准确）。纯正文修订，
+代码零改动（1d30c897 不变），线上正文待用户同步该行。

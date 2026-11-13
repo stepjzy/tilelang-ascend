@@ -77,7 +77,6 @@ per-(b,h) matmul 循环逐位交叉验证）
 
 **测试平台**：Ascend 910B3（20 AIC + 40 AIV，HBM r+w 1263 GB/s）
 **测试配置**：B=1, S=8192, H=64, DK=128, DV=128, chunk_size=64, scale=1.0，全 fp32
-（对齐上游 `examples/kda/chunk_bwd_dqkwg.py` benchmark 入口）
 
 | **性能指标** | **测试结果** |
 | --- | --- |
