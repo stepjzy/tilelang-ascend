@@ -1,0 +1,26 @@
+}
+
+// get unit of dst src busrt length, unit is byte
+inline uint16_t GetBurstLenUnit(std::string srcDstId, bool isConv, bool isSrc)
+{
+    uint16_t burstLenUnit = 0;
+    auto burstLenUnitMap =
+        isSrc ? ConstDefiner::Instance().srcBurstLenUnitMap : ConstDefiner::Instance().dstBurstLenUnitMap;
+    if (burstLenUnitMap.find(srcDstId) != burstLenUnitMap.end()) {
+        burstLenUnit = burstLenUnitMap.at(srcDstId);
+        if (isConv) {
+            burstLenUnit /= HALF_FACTOR;
+        }
+    } else {
+        burstLenUnit = DEFAULT_C0_SIZE;
+    }
+    return burstLenUnit;
+}
+
+// get unit of dst src stride, unit is byte
+inline uint16_t GetStrideUnit(std::string srcDstId, bool isSrc)
+{
+    auto strideUnitMap = isSrc ? ConstDefiner::Instance().srcStrideUnitMap : ConstDefiner::Instance().dstStrideUnitMap;
+    if (strideUnitMap.find(srcDstId) != strideUnitMap.end()) {
+        return strideUnitMap.at(srcDstId);
+    }
