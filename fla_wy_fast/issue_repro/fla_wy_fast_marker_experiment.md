@@ -1,7 +1,7 @@
 # fla_wy_fast 标记值实验（重建版）——散列地址重写 bug 的复现尝试
 
 > 日期：2026-11-13 · 环境：远程 910B3（DevEnvC_DCbyi_npu，CANN 9.2.0，repo `463c234c`）
-> 脚本：本目录 `fla_wy_fast_marker_scatter_exp.py`（单臂） / `fla_wy_fast_marker_scatter_v2.py`（三臂）
+> 脚本：过程性探索脚本已清理（结论完整记录于本文与 debug_log.md Attempt 1）
 > 背景：开发期对"散列地址重写"（伞形缺陷第 3 条，未提交）做过一次性标记值实验（结论见
 > debug_log Attempt 1：cid=8 的数据落 bb=1 而非 bh=1），探针脚本未归档。本轮按原方法论重建
 > 独立版，兼作该缺陷的最小复现尝试。

@@ -11,9 +11,9 @@ TileLang 编译分两步：Python DSL → **C++ 源码（本目录三份文件�
 
 | 文件 | 对应实验臂 | 写入方式 | 实测结果 |
 |---|---|---|---|
-| `gen_contig.cpp` | contig | 目的地连续 | ✅ 0/512 错 |
-| `gen_direct.cpp` | direct | 目的地跨步，源 `[64]` | ❌ 504/512 错 |
-| `gen_staged.cpp` | staged | GM 中转后跨步，源 `[64,1]` | ❌ 511/512 错（简单 kernel） |
+| `gen_contig_latest.cpp` | contig | 目的地连续 | ✅ 0/512 错 |
+| `gen_direct_latest.cpp` | direct | 目的地跨步，源 `[64]` | ❌ 504/512 错 |
+| `gen_staged_latest.cpp` | staged | GM 中转后跨步，源 `[64,1]` | ❌ 511/512 错（简单 kernel） |
 
 ## 二、核心行对比（一眼看出问题）
 
