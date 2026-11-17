@@ -85,3 +85,46 @@ bwd 被拆 6 kernel（k1/k2/v1/v2/gk/gz）。k1（dA 部分和 + dk2/dg2/dbeta�
   - #1908 [open] AscendLowerParallelToVector drops Block annotations →
     silent wrong results for flat-L1 K-slice
   - 我们自己的 #1926（多跳 C/V 挂死，与本问题相邻但不同）
+
+## 八、权威来源核验（2026-11-16 追加）：gemm_v0 是否支持"同一 L1 buffer 先 L0A 后 L0B"
+
+按用户要求，逐级查官方文档源码对"角色互换"的契约声明：
+
+1. **TileLang 官方 API docstring**（`tilelang/language/ascend.py:418` `gemm_v0`，
+   对应文档站 https://tilelang.ai/autoapi/tilelang/language/index.html）：
+   > "A and B must be in L1 (``T.alloc_L1``). gemm_v0 internally handles
+   > L1→L0A/L0B movement."
+   
+   **无任何"A/B 不可复用同一 L1 buffer / 不可角色互换"约束。**
+
+2. **项目官方编程指南**（`docs/TileLang-Ascend Programming Guide.md`）：
+   - L596：shared→L1/UB、fragment→L0A/L0B/L0C，编译器按上下文自动分析和识别；
+   - L629-630：L1→L0A（左矩阵）与 L1→L0B（右矩阵）是**两条独立搬运路径**，
+     无排他性声明。
+
+3. **gemm_v0 模板实现**（`src/tl_templates/ascend/common.h`）：
+   每次调用自包含（开头 prime `SetFlag<MTE2_MTE1>/FIX_M/M_MTE1`、
+   结尾 drain `WaitFlag<M_MTE1>`），循环内对 caller 传入的 L1 地址
+   执行 `copy_l1_to_l0a / copy_l1_to_l0b`——**无任何地址角色状态机**。
+
+4. **copy_l1_to_l0a / copy_l1_to_l0b 实现**（common.h L181/L232，底层为
+   catlass `TileCopyTla` + `AscendC::LoadData/LoadDataWithTranspose`）：
+   **纯函数式搬运**——入参只是 src/dst 地址+几何，无"该地址曾用作何种角色"
+   的检查，代码路径对第一次/第二次/角色互换使用完全相同。
+
+5. **官方测试覆盖**（`testing/python/language/test_tilelang_ascend_language_l1_to_l0.py`，
+   8 组 L1→L0A/L0B 正确性场景）：**没有任何"同一 buffer 先后充当 A/B"用例**。
+   未覆盖 ≠ 禁止，但说明官方从未回归这个组合。
+
+6. **CANN 侧**：公共 `DataCopy` API 无 L1→L0A/L0B overload（该搬运是 Cube 专用，
+   只在 catlass 模板层）；CANN 9.2.0 安装包内无文档目录可查。
+
+**结论**：所有官方来源都把 L1→L0A/L0B 描述为对地址无角色约束的纯搬运——
+**gemm_v0 的 API 契约支持"同一 L1 buffer 先入 L0A 再入 L0B"**；不存在 gemm_v0
+单点 API 层面的"角色互换 Bug"。若该组合出现问题，缺陷必然位于更高层 pass
+（memory planning / C/V 划分 / sync insertion / Pipelined 版本化），而非
+gemm_v0 本身——这与 §8-3 上下文（多 gemm 组 + 完整 V 算链 + UB 压力）以及
+相邻 issue（#1926 多跳 C/V 挂死、#110 double-buffer auto-sync、#1908
+Block 注解丢失 → L1 K-slice 静默错）的层次一致。即：**"多 gemm 组 L0 staging
+损坏"最可能的机理不是 gemm_v0 不支持，而是高层编译 pass 在 buffer 复用场景
+的缺陷（且本最小复现形态未触发该 pass 缺陷的激活条件）。**
