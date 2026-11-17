@@ -170,10 +170,8 @@ def fla_chunk_intra_token_parallel_kernel(
         Akk: T.Tensor(Akk_shape, dtype=output_dtype),  # type: ignore
     ):
         with T.Kernel(CORE_EFF, is_npu=True) as (cid, vid):
-            # ---- V-side UB buffers ----
-            # per-head load staging + fp32 rows (consumed within one
-            # factorize iteration; whole-block slabs would blow the UB
-            # budget once the accumulators' liveness is anchored)
+            # ---- V-side UB buffers: per-head staging rows (whole-block
+            # slabs would blow the UB budget once liveness is anchored) ----
             q_h_row = T.alloc_ub([SCS, DK], input_dtype)
             k_h_row = T.alloc_ub([SCS, DK], input_dtype)
             q_f_row = T.alloc_ub([SCS, DK], gate_dtype)
@@ -184,20 +182,16 @@ def fla_chunk_intra_token_parallel_kernel(
             e = T.alloc_ub([SCS, DK], gate_dtype)  # E-/E+/K'' chain
             kgj = T.alloc_ub([SCS, DK], gate_dtype)  # K' = k * E-
             bc_row = T.alloc_ub([SCS, DK], gate_dtype)  # anchor broadcast
-            # beta-fold vectorization scratch (one-hot select + row reduce +
-            # column broadcast; replaces 16 scalar muls/head)
+            # beta-fold scratch (one-hot select + row reduce + broadcast)
             eq_m = T.alloc_ub([SCS, 16], "uint8")  # (j == h) one-hot mask
             beta_sel = T.alloc_ub([SCS, 16], gate_dtype)
             beta_col = T.alloc_ub([SCS, 1], gate_dtype)
-            # per-task j-index grid for the one-hot compare (built from the
-            # hoisted idx values; a dedicated produce-live buffer keeps the
-            # hoist-only j_grid liveness from extending over the loop)
+            # per-task j-index grid for the one-hot compare
             j16b = T.alloc_ub([SCS, 16], gate_dtype)
             # per-vid fp32 operand accumulators (fill-anchored liveness)
             a_agg = T.alloc_ub([AMV, DK], op_dtype)
             b_agg = T.alloc_ub([BNV, DK], op_dtype)
-            # masks / index grids (attention_sink pattern); loop-invariant
-            # -> computed ONCE per core
+            # masks / index grids -- loop-invariant, computed once per core
             idx = T.alloc_ub([SCS], gate_dtype)
             idx16 = T.alloc_ub([16], gate_dtype)  # beta staging width is fixed 16
             i_grid = T.alloc_ub([SCS, SCS], gate_dtype)
@@ -208,12 +202,9 @@ def fla_chunk_intra_token_parallel_kernel(
             r_ub = T.alloc_ub([2 * SCS, SCS], gate_dtype)
             r1_m = T.alloc_ub([SCS, SCS], gate_dtype)
             a_m = T.alloc_ub([SCS, SCS], gate_dtype)
-            # drain staging, PER-HEAD REUSE: single-head [SCS, *]
-            # buffers refilled/drained inside the h loop (replaces the
-            # [BH_V, SCS, *] whole-task layout, 30KB -> 7.5KB; the
-            # planner's ExtendKillIndex makes drain+produce buffers
-            # coexist over the whole task loop, and the freed 22.5KB is
-            # what unblocks the beta-fold scratch below)
+            # drain staging: single-head [SCS, *] buffers reused per h
+            # (a [BH_V, SCS, *] whole-task layout would force drain+
+            # produce to coexist over the whole loop and exceed the budget)
             aqk_s = T.alloc_ub([SCS, CS], gate_dtype)
             akk_s = T.alloc_ub([SCS, AKK_W], gate_dtype)
             aqk_h = T.alloc_ub([SCS, CS], output_dtype)
@@ -231,14 +222,9 @@ def fla_chunk_intra_token_parallel_kernel(
             T.tile.broadcast(i_grid, idx, axis=1)  # i_grid[r, c] = r
             T.tile.compare(lt_m, i_grid, j_grid, "GE")  # r >= c (j <= i)
             T.tile.compare(slt_m, i_grid, j_grid, "GT")  # r > c (j < i)
-            # The one-hot compare source [SCS,16] (j16b[r, c] = c)
-            # is loop-invariant too -- hoisting its broadcast kills one
-            # vector op per task section; the buffer's planner interval
-            # is unchanged (ExtendKillIndex already extends it from the
-            # peeled-0 touch to the loop tail, same as lt_m/slt_m).
-            # idx16 (not idx!): the beta staging width is a FIXED 16
-            # columns, so the broadcast source must be length 16 -- idx
-            # only works at SCS == 16 by coincidence
+            # j16b is loop-invariant (hoisted like lt_m/slt_m); its
+            # source must be idx16 -- the beta staging width is a fixed
+            # 16, idx only matches at SCS == 16 by coincidence
             T.tile.arith_progression(idx16, 0.0, 1.0, 16)
             T.tile.broadcast(j16b, idx16, axis=0)
 
@@ -251,8 +237,8 @@ def fla_chunk_intra_token_parallel_kernel(
             i_s = sc % (CS // SCS)
             i_ts = c * CS + i_s * SCS
             h0v = hg * BH + vid * BH_V
-            # -- V: produce task cid (beta staging + fill-anchored
-            # accumulators + per-head factored construction + relay) --
+            # -- V: produce task cid (stage beta, fill-anchored
+            # accumulators, per-head factored construction, relay) --
             T.tile.fill(beta_h, 0.0)  # deterministic pad columns
             T.copy(Beta[bb, i_ts, h0v], beta_h[:, 0:BH_V])  # [SCS, BH_V] row-gap copy
             T.copy(beta_h, beta_f)  # UB<->UB cross-dtype cast copy (flat)
@@ -264,13 +250,10 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(GK[bb, i_ts : i_ts + SCS, h0v + h, :], g2_row)
                 T.tile.cast(q_f_row, q_h_row, "CAST_NONE", SCS * DK)
                 T.tile.cast(k_f_row, k_h_row, "CAST_NONE", SCS * DK)
-                # E- = exp((g_a - g_j) * ln2): the subtraction runs in the
-                # ORIGINAL log2 domain BEFORE the ln2 scaling -- at large
-                # |g| the scaled values round to the same fp32 (ulp of
-                # |g*ln2| can exceed the gate step, e.g. g ~ -1e8 with a
-                # step of 8) and the decay difference is lost; the
-                # raw-domain difference of adjacent fp32 gates is exact
-                # down to the 1-ulp boundary.
+                # E- = exp((g_a - g_j) * ln2): subtract in the RAW
+                # log2 domain BEFORE the ln2 scaling -- scaled values
+                # collapse to the same fp32 at large |g| and the decay
+                # difference is lost (see l1_deep_gate in the test).
                 T.tile.broadcast(bc_row, g2_row[anc : anc + 1, :], axis=0)
                 T.tile.sub(e, bc_row, g2_row)
                 T.tile.mul(e, e, LN2)
@@ -282,12 +265,9 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.tile.exp(e, e)
                 T.tile.mul(q_f_row, q_f_row, e)  # Q' = q * E+
                 T.tile.mul(e, k_f_row, e)  # K'' = k * E+
-                # fold beta into K'' rows (Akk = (beta*K'') @ K'^T)
-                # fold beta into K'' rows: one-hot select + row reduce +
-                # column broadcast -- bit-identical to the former per-row
-                # scalar muls (select keeps beta_f bits, reduce only adds
-                # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                # (the largest V-side item before this change)
+                # fold beta into K'' (Akk = (beta*K'') @ K'^T): one-hot
+                # select + row reduce + column broadcast, replacing 16
+                # scalar muls per head
                 T.tile.compare(eq_m, j16b, h, "EQ")
                 T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.reduce_sum(beta_sel, beta_col, dim=-1)
@@ -307,15 +287,10 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.gemm_v0(A_l1, B_l1, C_l0c, transpose_B=True, init=True)
                 T.copy(C_l0c, o_relay[cid, 0, gg, :, :])
             T.set_cross_flag("FIX", FLAG_BASE)
-            # -- V: trailing garbage drain (slot 2 % NSLOT, task cid's
-            # region, NO wait): with NSLOT=2 this races C's FIX(0) and
-            # writes stale/garbage values that the real drain at t == 2
-            # (dt == cid) overwrites bit-identically; keeps the o_relay
-            # V-side read-site counts balanced with the C-side writes.
-            # per-head drain: fill/select/cast/writeback per h on
-            # the single-head [SCS, *] buffers (bit-identical: same
-            # elementwise ops on the same values; cleared-row zeros
-            # re-established by the per-head fill) --
+            # -- V: trailing garbage drain (slot 2 % NSLOT, NO wait):
+            # the real drain at t == 2 overwrites it bit-identically;
+            # keeps the o_relay read-site counts balanced with C's
+            # writes. Per-head drain on single-head [SCS, *] buffers --
             w = i_s * SCS
             for h in T.serial(BH_V):
                 gh = vid * BH_V + h
@@ -364,11 +339,7 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.tile.exp(e, e)
                 T.tile.mul(q_f_row, q_f_row, e)
                 T.tile.mul(e, k_f_row, e)
-                # fold beta into K'' rows: one-hot select + row reduce +
-                # column broadcast -- bit-identical to the former per-row
-                # scalar muls (select keeps beta_f bits, reduce only adds
-                # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                # (the largest V-side item before this change)
+                # fold beta into K'' (see the peeled-0 site)
                 T.tile.compare(eq_m, j16b, h, "EQ")
                 T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                 T.reduce_sum(beta_sel, beta_col, dim=-1)
@@ -386,9 +357,8 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.gemm_v0(A_l1, B_l1, C_l0c, transpose_B=True, init=True)
                 T.copy(C_l0c, o_relay[cid, 1 % NSLOT, gg, :, :])
             T.set_cross_flag("FIX", FLAG_BASE + 1)
-            # -- V: trailing garbage drain (slot 3 % NSLOT, task pt1's
-            # region, NO wait; overwritten by the real drain at t == 3);
-            # per-head drain (see the peeled-0 site) --
+            # -- V: trailing garbage drain (slot 3 % NSLOT, NO wait;
+            # overwritten at t == 3); per-head drain as in peeled-0 --
             w1 = i_s1 * SCS
             for h in T.serial(BH_V):
                 gh = vid * BH_V + h
@@ -406,12 +376,9 @@ def fla_chunk_intra_token_parallel_kernel(
                 T.copy(aqk_h, Aqk[bb1, i_ts1 : i_ts1 + SCS, h0v1 + h, :])
                 T.copy(akk_h[:, 0:SCS], Akk[bb1, i_ts1 : i_ts1 + SCS, h0v1 + h, :])
 
-            # ==== steady-state pipeline loop: t = 2 .. TPT + 1 ====
-            # V: drain(t-2) [manual flag from iteration t-2] -> produce(t)
-            #    [auto-flag relay]; C: gemm(t) -> FIX(t) [manual flag].
-            # Out-of-range produce/drain targets redirect branch-free to
-            # the core's own first task (bit-identical recompute; garbage
-            # drains are overwritten by the real ones).
+            # ==== steady-state loop: V drain(t-2) -> produce(t);
+            # C gemm(t). Out-of-range targets redirect branch-free to the
+            # core's own first task (bit-identical recompute) ====
             for tt in T.serial(TPT):
                 t = tt + 2
                 tid = cid + t * CORE_EFF
@@ -437,13 +404,11 @@ def fla_chunk_intra_token_parallel_kernel(
                 i_tsp = cp * CS + i_sp * SCS
                 h0vp = hgp * BH + vid * BH_V
 
-                # -- V: drain task dt (post-process t-2's gemm results;
-                # manual flag pairs with iteration t-2's FIX; the "V" pipe
-                # argument attributes the wait to the Vector core for the
-                # CombineCV resource verifier) --
+                # -- V: drain task dt; the manual flag pairs with
+                # iteration t-2's FIX ("V" attributes the wait to the
+                # Vector core for the CombineCV verifier) --
                 T.wait_cross_flag(FLAG_BASE + t % 2, "V")
-                # per-head drain (see the peeled-0 site): fill/
-                # select/cast/writeback per h on single-head buffers
+                # per-head drain as in peeled-0
                 wd = i_sd * SCS
                 for h in T.serial(BH_V):
                     gh = vid * BH_V + h
@@ -483,11 +448,7 @@ def fla_chunk_intra_token_parallel_kernel(
                     T.tile.exp(e, e)
                     T.tile.mul(q_f_row, q_f_row, e)
                     T.tile.mul(e, k_f_row, e)
-                    # fold beta into K'' rows: one-hot select + row reduce +
-                    # column broadcast -- bit-identical to the former per-row
-                    # scalar muls (select keeps beta_f bits, reduce only adds
-                    # zeros) and kills 16 scalar GetValue + tiny Muls per head
-                    # (the largest V-side item before this change)
+                    # fold beta into K'' (see the peeled-0 site)
                     T.tile.compare(eq_m, j16b, h, "EQ")
                     T.tile.select(beta_sel, eq_m, beta_f, 0.0, "VSEL_TENSOR_SCALAR_MODE")
                     T.reduce_sum(beta_sel, beta_col, dim=-1)
@@ -560,10 +521,8 @@ def fla_chunk_intra_token_parallel(q, k, gk, beta, chunk_size=64, sub_chunk_size
 
 
 if __name__ == "__main__":
-    # Smoke entry (the CI legacy runner executes this file with `python`):
-    # minimal fixed-length shape, output-shape/finite checks, "Test Passed!"
-    # on success. Numerical accuracy is covered by
-    # test_fla_chunk_intra_token_parallel.py (PyTorch golden).
+    # CI smoke entry: minimal shape, output-shape/finite checks.
+    # Numerical accuracy lives in test_fla_chunk_intra_token_parallel.py.
     import torch_npu  # noqa: F401  (registers .npu() on torch)
 
     tilelang.cache.clear_cache()
