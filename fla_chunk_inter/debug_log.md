@@ -265,3 +265,19 @@ push→远端内容终验）。
 examples/kda/chunk_bwd_dqkwg.py benchmark 入口）"；计时口径说明保留
 "上游 KDA 示例 do_bench"泛指（不点名具体文件，事实准确）。纯正文修订，
 代码零改动（1d30c897 不变），线上正文待用户同步该行。
+
+## Attempt PR-CI8: 注释精简（用户问"有没有冗长注释"，2026-11-13）
+
+**发现**：fla_chunk_inter.py 模块 docstring 64 行（占文件 13%）——其中
+"Performance structure" 16 行为过程叙事（19.5→6.7ms 优化史 + do_bench 数字，
+与 PR 描述重复，违反 skill 文风"性能叙事归 PR 正文"），slot 10 内核注释 6 行
+与 docstring 重复。
+**精简**：模块 docstring 64→42 行（删性能叙事段与重复数字；保留全部防错事实：
+数学语义/结构概要/scratch-free 红线/hi/lo/exp2 适配/flag slot 10/MAINTENANCE
+NOTE）；slot 10 注释 6→5 行去重。文件 491→467 行，kernel 逻辑 AST 等价
+（纯注释修订）。
+**关键验证（注释文本=编译上下文，MAINTENANCE NOTE 自身警示）**：NPU 实跑
+精简版——交付测试 8/8 精度逐位不变（4.578e-05/1.831e-04/9.537e-06/2.441e-04
+与精简前完全一致 → UB 布局未翻转）+ domain rejection + smoke 双路径全绿。
+**推送**：4472e45d（完整纪律：显式 add→暂存核验→amend→push→远端内容终验
+467 行版本）。CI 待跑。
