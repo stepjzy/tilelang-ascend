@@ -1,0 +1,5 @@
+[SMOKE_PASS] fla_chunk_intra fwd+bwd B=1 S=64 H=2 DK=128 chunk=64 sub_chunk=16
+Test Passed!
+14
+Kernel Output Match!
+DOCTRIM_VERIFY_DONE
