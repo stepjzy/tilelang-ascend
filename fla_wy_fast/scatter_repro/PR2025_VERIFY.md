@@ -59,3 +59,50 @@ PR 本身，也无法确认修复效果**。
      c) 在 PR 代码跑交付算子 fla_wy_fast 全量测试（L0/L1/L2/Boundary），
         确认修复对交付算子无回归（尤其 bwd dbeta 散列路径）。
    - 若三臂 direct 归零，可在 PR 页面评论确认修复有效（附复现数据）。
+## 五、追加（2026-11-20 下午）：真凶定位 + PR 2025 干净验证 ✅
+
+### 5.1 两个环境问题先后定位（完整实验矩阵）
+
+| tilelang | catlass | torch_npu | contig×N |
+|---|---|---|---|
+| 4805777d | v1.0.0 (`67fd2820f`) | 2.7.1.post11 | **5/5 全 PASS 稳定** |
+| ce411463 | **v2.2.0** (`6c0a3242b`) | 2.7.1.post11 | 漂移 512/511/0 |
+| ce411463 | v2.2.0 | 2.10.0 | 漂移 104/511/512 |
+
+**真凶 1 = catlass v2.2.0 升级回归**（ce411463 #1989）：910B3 + CANN 9.2.0 下
+copy 路径**非确定性数据错误**。11-16 归因"torch 环境"是错的——当天真正的
+变化是我们把 NPU 切到了 ce411463（catlass v2.2.0）。今天 torch 降级后仍漂移、
+切回 catlass v1 后 5/5 稳定，实锤。
+**真凶 2（次要）= torch_npu 2.10 错配**（非官方 release，华为镜像最高 2.8.0rc1）。
+修复动作：torch 2.7.1 + torch-npu 2.7.1.post11（pip 用户级，可逆）。
+
+### 5.2 PR #2025 干净验证（隔离 catlass 漂移）
+
+方法：4805777d（catlass v1）上 cherry-pick `aae51016` → 重编 → 验证。
+
+| 项 | 结果 |
+|---|---|
+| scatter 三臂 contig | **0/512 PASS** |
+| scatter 三臂 **direct** | **0/512 PASS**（修复前 504/512 错）|
+| scatter 三臂 staged | 511/512（与历史一致：简单 kernel 缺 flag 链，非回归）|
+| PR 自带 `test_tilelang_ascend_language_strided_copy.py` | **13/13 PASS**（此前在 catlass v2.2.0 下 13/13 FAIL）|
+
+### 5.3 新生成代码（direct 臂，`/tmp/tmp*.cpp`）
+
+```cpp
+tl::ascend::copy_ub_column_pack<float>(copy_column_ub[0], computed[0], 64);
+tl::ascend::copy_ub_to_gm<float, 8, 64>(output[((repeat * 512) + cid)], copy_column_ub[0], 8, 64, 1);
+```
+
+与旧代码 `copy_ub_to_gm<float,64>(..., 8, 64, 1)`（srcN=64 → srcStride=7 越界）
+对照：修复后 srcN=8（32B 槽宽）与 maskShapeN=1 自洽，srcStride=(32−4)/32=0，
+每 burst 前进 1 槽 —— 正是 VERDICT2 的"槽化后散列"方案。
+
+### 5.4 最终结论
+
+1. **PR #2025 修复 direct 散列有效**（干净基线上三臂 direct 0 错 + 13/13 回归全过）。
+2. **catlass v2.2.0 回归**是独立新发现（非确定性 copy 错误，910B3+CANN 9.2.0），
+   建议单独向 #1989 或新 issue 报告——它同时污染了 PR 的 CI 环境假设
+   （PR 作者 CI 在 CANN 9.1.0-beta.1 全过，可能该组合不触发）。
+3. 验证配方（复用）：4805777d + cherry-pick PR 2025 + torch_npu 2.7.1.post11 + 重编。
+4. 待办：交付算子 fla_wy_fast 全量（L0/L1/L2/Boundary）在该配方上复验（可选）。
