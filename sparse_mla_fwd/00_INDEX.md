@@ -35,7 +35,8 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-fwd-pr（origin，已 push）
-- **PR 尚未创建** → PR_DESCRIPTION.md（PR 正文，提交时直接使用）
+- PR [#1929 open](https://github.com/tile-ai/tilelang-ascend/pull/1929)（线上正文已回填
+  PR_DESCRIPTION.md；本地稿 PR_DESCRIPTION_draft.md 留档）
 
 ## 遗留疑问 / 未走通的路
 - ~~46667us 干净基线之后的优化空间~~ **已闭合（Round 2）**：dtype 路径证伪、

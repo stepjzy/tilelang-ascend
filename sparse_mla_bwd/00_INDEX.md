@@ -6,11 +6,11 @@
 
 ## 阅读顺序（约 2.5h）
 1. `ref_gpu.py`（30min）→ 迁移源头：sparse_mla 反传语义
-2. `DESIGN_sparse_mla_bwd.md`（1h）→ **先读 §0 rev3 回退证据与重设计总纲**
+2. `DESIGN.md`（1h）→ **先读 §0 rev3 回退证据与重设计总纲**
    （门禁必需章节——为什么 rev2 被推翻）；§4 总体架构（Developer pair-loop
    主路径 + Expert fallback + C/V 深度流水 + transit 融合）；§6 dKV 散射
    策略专题（随机行散射寻址能力查证与选型）——专题查证式设计的范例
-3. `debug_log_sparse_mla_bwd.md`（40min）→ 核心坑：L1 值域轴 4/15 失败，
+3. `debug_log.md`（40min）→ 核心坑：L1 值域轴 4/15 失败，
     根因**定位到 DESIGN §12 校准层而非实现层**（Δ-from-bf16-o 接口颗粒 +
     高集中度抵消区逐元素门限不可满足）——"设计错还是实现错"的判别范式；
     末条 Review fix（2026-10-29）：identity 缓存键的原地更新坑 + **评测热路径
@@ -28,9 +28,10 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-bwd-pr（origin，已 push）
-- [PR #1928](https://github.com/tile-ai/tilelang-ascend/pull/1928)（open，2026-10-29 review
+- [PR #1928](https://github.com/tile-ai/tilelang-ascend/pull/1928)（**已合并 upstream，2026-11-13**；
+  线上正文已回填 PR_DESCRIPTION.md。2026-10-29 review
   意见已修复：`_tensor_cache` 身份键 → identity + mutation version，附内容键 +3.6% 计时
-  代价的 A/B 实测权衡，见 debug_log 末条 Review fix）
+  代价的 A/B 实测权衡，见 debug_log.md 末条 Review fix）
 
 ## 遗留疑问 / 未走通的路
 - Δ-from-bf16-o 接口颗粒问题的最终口径（校准层修订后的门禁定义）

@@ -30,7 +30,7 @@
 
 ## 交付物
 - 分支 feat/sparse-mla-topk-reducesum-pr（origin）
-- **PR #1884 open**（线上正文已存 PR_DESCRIPTION.md（#1884 线上正文）；
+- **PR #1884 已合并 upstream（2026-11-13）**（线上正文已存 PR_DESCRIPTION.md（#1884 线上正文）；
   本地稿 PR_DESCRIPTION_draft.md / official_template.md 留档对照）
 - 注意：-pr 分支最终版与沙箱版有差异（Ruff 格式化 + 提交前清理），
   对照学习时以 -pr 分支为交付真源

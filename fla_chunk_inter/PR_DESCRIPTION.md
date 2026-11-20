@@ -121,8 +121,5 @@ per-(b,h) matmul 循环逐位交叉验证）
 - **即使 V 侧三引擎完美重叠，C 侧 busy 5507 μs 仍在目标之上**——C busy 由
   12 gemm/任务（fp32 gemm 损坏 → hi/lo 3-gemm 放大）锚定，此项为工具链上游
   修复项（fp32 gemm 修复将同时消 3× gemm 数与中继字节减半，可达带重开）。
-- **更远的地板**：threads=2（40 AIV）受 vid 切分语义限制（本工具链
-  `ascend_vid_reduction.cc` 的 broadcast/跨 vid 归约缺口）不可用；修复后装载
-  带宽翻倍。HBM 唯一 IO 物理界 2980 μs@100% / 3673 μs@81%（同平台实证最佳
-  效率）。
+
 

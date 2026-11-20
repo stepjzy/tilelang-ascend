@@ -7,7 +7,7 @@ PTO / AscendC 双后端下各自独立的调优方法论。
 ## 阅读顺序（约 2.5h）
 1. `ref_gpu.py`（30min）→ 迁移源头：golden = `ref_index_score`
    （ref_gpu/indexer_topk_reducesum.py:208-229）
-2. `DESIGN_indexer_topk_reducesum.md`（1h）→ §1.4 双路径架构（fast/generic）、
+2. `DESIGN.md`（1h）→ §1.4 双路径架构（fast/generic）、
    §1.5 数据流图（fast 路径，每任务 QG=8 token、每 K 块 BN=32）、
    §2 编程模式选型、§3.2 API 映射（全部附出处）——模板级的设计文档范例
 3. `perf_tuning/indexer_topk_reducesum_final_summary.md`（30min）→
@@ -26,7 +26,8 @@ PTO / AscendC 双后端下各自独立的调优方法论。
 
 ## 交付物
 - 分支 feat/indexer-topk-reducesum-pr（origin，已 push）
-- **PR 尚未创建** → PR_DESCRIPTION.md（PR 正文，提交时直接使用）
+- PR [#1917 open](https://github.com/tile-ai/tilelang-ascend/pull/1917)（线上正文已回填
+  PR_DESCRIPTION.md；本地稿 PR_DESCRIPTION_draft.md 留档）
 
 ## 遗留疑问 / 未走通的路
 - generic 路径性能未优化（是否有必要？）

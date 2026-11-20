@@ -54,7 +54,8 @@ NPU 远程执行）下按新 migration skill 的全量重迁移实证（含 flag
   （实现 = <源基名>.py、测试 = test_<源基名>.py，不另加前缀）
   （来源 examples/kda/FLA_KDA/fla_chunk_inter.py → 合入 examples_experiment/
   kda/FLA_KDA/）；CI 全绿
-- PR: 待用户网页创建（文稿见本目录 PR_DESCRIPTION.md：19556→6741.8us
+- PR: [#1994 open](https://github.com/tile-ai/tilelang-ascend/pull/1994)（线上正文已回填
+  PR_DESCRIPTION.md；本地稿 PR_DESCRIPTION_draft.md 留档：19556→6741.8us
   前后比对 + 可达值依据，不含目标对比）
 - 性能：第二轮终态 **6741.8us**（do_bench 3 次独立；OPPROF 6502.7 /
   PROF 6657.2 交叉验证）；vs 第二轮 Stage 2 基线 6810.9 = -1.02%；vs 首次
