@@ -4,148 +4,43 @@ Ascend 910B3 (Developer mode, threads=1).
 Semantics follow the upstream tilelang KDA intra-chunk kernels
 (examples/kda/FLA_KDA/fla_chunk_intra.py, Triton/FLA reference).
 
-fwd  (chunk_kda_fwd_inter_solve_fused):  per (chunk, bh):
-  * off-diagonal blocks (s2 in {1,2,3}, anchor gn = g[s2*16, :]):
-        qg   = q_{s2} * 2^(g_{s2} - gn)          Aqk[s2, 0:16*s2] = scale * qg @ rhs^T
-        kg'  = k_{s2} * 2^(g_{s2} - gn) * (-beta)   (sign-folded Akk-beta')
-        rhs  = k_{0:16*s2} * 2^(gn - g_{0:16*s2})   Akkbp[s2, 0:16*s2] = kg' @ rhs^T
-  * 4 diagonal forward substitutions: Ai_ss = (I + strict_tril(A_s))^{-1}
-        (row recursion, pure-V T.serial; N_s = -strict_tril(A_s) via the
-        Mneg constant -- the negation lives inside N, upstream L264-274)
-  * merged block inverse via the sign-folded identity
-        G  = AiDiag @ Akkbp          (Akkbp = -beta*Akk, so kernel G = -G_orig)
-        Ai = (I + G)(I + G^2) D^{-1} (= M^{-1}, block lower triangular)
-  * Aqk/Akk outputs bf16; Aqk diagonal + block-upper-tri explicitly written 0
-    (deterministic contract); Akk block-upper-tri is exact 0.
+fwd (chunk_kda_fwd_inter_solve_fused), per (chunk, bh):
+  * off-diagonal decayed GEMM blocks -> Aqk (x scale) and the sign-folded
+    Akk-beta' (Akkbp): with gn = g[s2*16, :] the anchors cancel inside the
+    products, so Aqk = scale * (q*2^g) @ (k*2^-g)^T and Akkbp carries the
+    -beta row scale
+  * 4 diagonal forward substitutions Ai_ss = (I + strict_tril(A_s))^{-1}
+    (pure-V row recursion)
+  * merged block inverse Ai = (I + G)(I + G^2) D^{-1}, G = AiDiag @ Akkbp
+  * outputs bf16; Aqk diagonal + block-upper-tri are written as exact 0
 
-bwd  (chunk_kda_bwd_intra):  TWO JIT kernels.
-The per-column sequential loops of the upstream (B)/(E) steps are
-re-expressed as masked GEMMs (mask depends only on (i, j), never on
-iteration state):
-  (A)+(B)  dq2_pre_s  = D_s * ( MdA[s*16:+16, 0:KMAX] @ Kdec_s )   KMAX=32/32/48/64
-           dk2pre_s   = same with MdK                     (s=0 pads K to 32 via
-                                                             MdA block (0,1)'s
-                                                             exact-zero columns)
-  (D)+(E)  dkt_s      = V_s * ( MdA[:, s*16:+16]^T @ Qdec_s
-                              + MdK[:, s*16:+16]^T @ KBdec_s )
-           Kdec_s[j] = k_j * 2^(gn_s  - g_j)     gn_s  = g[s*16, :]
-           Qdec_s[j] = q_j * 2^(g_j - gn'_s)     gn'_s = g[(s+1)*16-1, :]
-           KBdec_s[j]= beta_j k_j * 2^(g_j - gn'_s)
-           D_s[i]    = 2^(g_i - gn_s)             V_s[i]  = 2^(gn'_s - g_i)
-  tail (per s): db_s = rowsum(D_s*dk2pre_s * k_s)  [pre-beta, accumulated across
-           halves into db_acc]; dk2b_s = D_s*dk2pre_s * beta_s;
-           dq2_s = D_s*dq2_pre_s + dq;   dk2_s = dk2b_s + dk + dkt_s;
-           dg2_s = q_s*(D_s*dq2_pre_s) + (dk2b_s - dkt_s)*k_s + dg
-           [post-beta dk2, upstream L481-489 order; the D_s/V_s post-scalings on
-           the dk2/dkt chains are load-bearing]
-  host post-processing (NOT part of the kernel, not timed): db = db2.sum(0)+db,
-           dg = reverse chunk-local cumsum(dg2).
+bwd (chunk_kda_bwd_intra): the per-column sequential loops of the upstream
+(B)/(E) steps are re-expressed as masked GEMMs whose masks depend only on
+(i, j), never on iteration state.  Two JIT kernels: k_stage (pure Vector)
+builds every GEMM operand tile into GM scratch; k_gemm (one Pipelined C/V
+body over the DK halves) runs the gemms and the post-beta tail.  Host post-
+processing (db2.sum(0)+db, reverse chunk-local cumsum of dg2) stays with the
+caller, matching the upstream kernel/test boundary.
 
-   k_stage (pure Vector, straight-line, zero cross-core flags): builds every
-     GEMM operand tile in UB and writes them to the GM staging tensors
-     OpscrM / Opscr.  The kernel boundary (host-ordered launch) provides the
-     V->C synchronization.  mid-anchor super-GEMM staging: the
-     per-s anchors cancel inside the post-scaled sums, so ONE shared operand
-     per matrix role serves all 4 s blocks -- MdA/MdK full [64,64] hi/lo
-     tiles and per-half K~/Q~/KB~ [64,BK] hi/lo tiles (chunk-mid anchor
-     a = g[2*BC, :] bounds every fp16 operand exponent by the half-chunk
-     decay, below the old Kdec envelope).
-   k_gemm (Pipelined(2, num_stages=1) over the DK halves; body = one C run
-     then one V run): the C side reads every tile from GM into a whole-tile
-     L1 buffer, runs the 12 hi/lo gemm_v0 (4 logical: dq2_pre = MdA@K~,
-     dk2_pre = MdK@K~, dkt_pre = MdA^T@Q~ + MdK^T@KB~), writes the 3
-     results L0C->GM directly (Fragscr, k1 precedent) and signals
-     T.set_cross_flag("FIX", 9 + i_kk % 2); the V side waits
-     T.wait_cross_flag(9 + i_kk % 2, "V"), reads the frags back and runs
-     the corrected tail with the shared post-scales ea = 2^(g-a) (dq2/dk2
-     rows) and eam = 2^(a-g) (dkt rows).  Cross-core flag budget: exactly
-     2 ffts IDs (9, 10).
-
-Ascend toolchain adaptations (all inherited from the fla_wy_fast / fla_chunk_o
-verified chains):
-
-1. Eight JIT kernels (fwd 6 + bwd 2): the C/V combine supports at most one
-   straight-line C segment (or one Pipelined body) per kernel; the merged
-   inverse chain is therefore split k_inter -> k_subst + k_g -> k_g2 -> k_y
-   -> k_ai with pre-split bf16 hi/lo workspace pairs (Akkbp / AiDiag / G /
-   G2 / Y -- each an (hi, lo) pair, same bytes as one fp32 tensor); k_subst
-   is the pure-V row-recursion forward substitution writing its result
-   straight to GM, k_g the relay-free direct-read GEMM consumer.  the consumer
-   kernels read the pairs DIRECTLY GM->L1 in their C sections (no UB->L1
-   relay, no V-phase re-staging); the I+ adds fold into exact fp32 epilogue
-   adds (Y = AiDiag + G2@AiDiag, Ai = Y + G@Y); Akkbp's rows 0..16 are
-   staged as explicit zeros -- 0 x NaN = NaN in the cube MACs, so unwritten
-   garbage rows would poison G rows 16+ through the c<16 K-slice.
-2. fp32 gemm_v0 operands are broken on this toolchain: every GEMM runs with
-   hi/lo split operands accumulated in L0C (fwd: bf16 hi/lo 3-gemm; bwd: fp16
-   hi/lo 3-gemm, KNOWN LIMITATION |x| > 65504 loses precision).
-3. All 18 fwd-inter / 48 bwd gemm_v0 calls are kept in ONE contiguous C run
-   (staging first, gemms after, epilogue last) -- no V op may interleave.
-4. exp2(x) as exp(x * ln2); bf16<->fp32 casts only UB-internally; L0C(fp32)
-   ->GM(bf16) stores stage through UB.
-5. [B,S,H] beta loads use the flat-view span + arith_progression +
-   reinterpretcast + tile.gather chain (sub-32B strided DMA is unreliable).
-6. The bwd db2 scatter stages through a GM scratch with an explicit
-   MTE3->MTE2 flag sync (computed-source [64,1] scatters are not kept
-   correct otherwise).
-7. Loop-carried reduce uses clear=True + T.tile.add accumulation (the
-   clear=False in-loop merge is a toolchain bug).
-8. bwd grid is NT*B*H with the DK halves iterated INSIDE k_gemm's Pipelined(2)
-   body; MdA/MdK and all decay operands are staged to GM by the separate
-   k_stage kernel, so nothing cross-core depends on a prologue relay.  db2 has
-   NK=1 partial (the rowsums of both halves accumulate in-program); the [NK,B,S,H] output
-   contract is honored via a zero-copy host view.
-9. The @T.prim_func body is parsed by the TVM AST parser,
-   NOT traced as plain Python: no Python lists / helper-function calls /
-   comprehensions / tuple loops inside the kernel body (they segfault the
-   parser).  The s/s2 static unrolls are written out literally and the
-   hi/lo split chains are inlined.
-10. Every UB->L1 (V->C) copy must use a DEDICATED UB source
-   buffer and every L0C->UB (C->V) copy a DEDICATED UB destination buffer:
-   ascend_workspace_reduction.cc keys the GM relay workspaces by buffer NAME
-   (src_to_workspace_map_ / dst_to_workspace_map_), so reusing one temp across
-   multiple cross-core copies collapses their relays and fails the CombineCV
-   sync-point pairing ("Mismatch in sync points ... cube has 1, vec has N").
-   Pure-V UB<->UB temps may be shared freely.
-11. CANN 9.2.0 GetffstMsg masks the cross-core
-   flag id with 0xf: only 16 ffts event slots exist and 11..14 are
-   system-reserved (SYNC_AIC/AIV/AIC_AIV/ALL), so at most ~11 user flags
-   survive.  A single-kernel bwd generates 40 distinct ids (28 UB->L1 relay
-   sites + 12 C->V relay sites) -- every id >= 16 truncates onto lower ids,
-   so the loop structure (V iter-1 writes vs C iter-0 reads) races.  Manual flags exist (T.set_cross_flag / T.wait_cross_flag) but a
-   user-side set on the "MTE3" pipe classifies kExplicit and T.Scope("V")
-   wrappers inside a Pipelined body get flattened away by
-   CrossCorePipeline's LoopAnalyzer, so a same-kernel V->C handshake is not
-   expressible; the bwd therefore became TWO kernels with the kernel
-   boundary as the V->C sync (k_stage / k_gemm), leaving exactly the 2
-   C->V FIX flag ids 9+i_kk%2.
-12. The implicit relay writes an L1 buffer as a
-   zN tile shaped by the COPY (a whole-buffer copy -> the buffer's own
-   shape), while gemm_v0 reads a zN tile shaped by the GEMM's template at
-   the region's flat row-major offset.  The two zN layouts agree only when
-   the relay copy's tile equals the gemm's operand tile (whole-buffer
-   operands, or the copy region == the gemm region); in particular a
-   row-offset/narrow-column region read of a whole-relayed buffer mixes
-   mismatched zN column-band strides (roundUp16(tile rows) vs
-   roundUp16(buffer rows)) and reads garbage.  Attempt-1's region operands
-   (mda_hi_l1[BC:2*BC, ...] etc.) all violated this and would have been
-   wrong even with perfect flags.  The v3 design keeps every gemm operand
-   a WHOLE L1 buffer fed by an exactly-shaped GM->L1 Nd2Nz read.
-13. L0C->GM direct fp32 stores (k1 precedent,
-   T.copy(frag, gm_tensor)) emit zero cross-core flags, and GM tensors whose
-   name lacks the "workspace" substring never get AUTO_CV_SYNC relay flags,
-   so Fragscr/OpscrM/Opscr handoffs cost nothing from the 16-slot budget.
-14. Narrow-row GM/UB copies round-trip through
-   32B slots: a [64,1]-region GM->UB read scatters its 4B bursts 32B apart
-   (the MTE "narrow rows sit in 32B slots" convention, issue-#1682 class)
-   and the matching [64,1] UB->GM write reads them back from the same slots
-   -- the star-chain pair only self-compensates while the final GM row
-   stride exceeds 4B (H >= 2).  At H == 1 (contiguous slice) the write goes
-   flat and the mismatch corrupts db2 (and the scattered reads can clobber
-   UB neighbors unless the dst buffer is at least 64*32B wide -- hence the
-   [BS,8] db2d).  H == 1 therefore writes db2 as a single 256B row through a
-   flat [B, S*H] view (host-allocated db2 + zero-copy db2f), which has no
-   narrow rows at all.
+Implementation notes (Ascend toolchain):
+  * The C/V combine allows only one straight-line Cube segment (or one
+    Pipelined body) per kernel, so the merged-inverse chain is split into
+    k_inter -> k_subst + k_g -> k_g2 -> k_y -> k_ai; intermediate results
+    cross kernels through pre-split bf16 hi/lo workspace pairs that the
+    consumer C sections read directly GM->L1 (no relays).
+  * fp32 gemm_v0 operands are broken on this toolchain; every GEMM runs as
+    hi/lo split operands accumulated in L0C (fwd bf16 3-gemm, bwd fp16
+    3-gemm -- |x| > 65504 loses precision).
+  * exp2(x) is computed as exp(x * ln2); the @T.prim_func body is TVM-AST
+    parsed (no Python lists / helper-function calls inside kernels).
+  * Cross-core ffts flags are limited to 16 slots (CANN GetffstMsg masks
+    the id with 0xf, 11..14 system-reserved); the fwd drain uses manual
+    alternating FIX flags and the bwd kernel boundary provides the V->C
+    sync, keeping the whole operator inside the budget.
+  * [B,S,H] beta loads use a flat-view span + arith_progression +
+    reinterpretcast + tile.gather chain (sub-32B strided DMA is unreliable).
+  * The db2 [64,1] scatter round-trips through 32B slots that only self-
+    compensate for H >= 2; H == 1 writes db2 through a flat [B, S*H] view.
 """
 
 import tilelang
@@ -155,8 +50,7 @@ from tilelang import language as T
 # 2^g is computed as exp(g * ln2): exp2 has no Ascend backend mapping.
 LN2 = 0.6931471805599453
 
-# fixed-core grid ceiling (Ascend 910B3 AI Cube cores) and relay slot
-# ring depth (>=2: cube lag bound 1 + margin) -- inter-sibling recipe
+# fixed-core grid ceiling (910B3 AI Cube cores) / relay slot ring depth
 CORE_NUM = 20
 NSLOT = 4
 
@@ -187,37 +81,14 @@ def _grid(B, S, H, chunk_size):
 
 
 # ============================================================================
-# fwd kernel 1: off-diagonal Aqk / Akk-beta' GEMMs (BK = DK)
-#
-# anchor-free super-GEMM: the per-s2 anchors cancel exactly
-# inside every product (qg_i * rhs_j = q_i k_j 2^(g_i-gn) * 2^(gn-g_j)
-# = q_i k_j 2^(g_i-g_j)), so 9 anchored operand builds collapse to 3
-# full-width operands:
-#   Aqk   = scale * Q~ @ K~^T          (Q~ = q*2^g, K~ = k*2^-g; the 6
-#          block-lower blocks are written, everything else 0)
-#   Akkbp = -(beta row) * (ktp @ K~^T)  (ktp = k*2^g; the -beta row scale is
-#          applied on the fp32 frag in the V drain -- exact fp32 scaling;
-#          the block (0,*) products are discarded at the writes)
-# bf16 operand range is fp32-like (+-2^127): no anchor needed for range; the
-# discarded upper-block products stay below the fp32 L0C accumulator
-# overflow bound for every in-suite gk (worst-case -1.8/token * 63 ->
-# products <= 2^124 < 2^128).
-#
-# FIXED-CORE task loop + explicit L2-resident relays (the
-# inter-chunk sibling's verified recipe): T.Kernel(CORE_EFF) with one
-# in-core T.serial(L) striped loop (task = cid + t*CORE_EFF; past-GRID
-# iterations Select-redirect to cid and idempotently RE-COMPUTE it, so the
-# tail drains write valid data).  Per iteration: produce(V) -> C -> drain(V,
-# 1-late).  This lets C(j+1) overlap produce(j)/drain(j) on the two cores
-# instead of the old per-block lockstep (msprof: AIC occupancy 7.4us/block
-# vs 2.7 productive -- wait_id6 on the auto-relay flags).  The 6 operand
-# relays are (CORE_EFF, NSLOT, ...) workspaces (8.3MB footprint, L2-resident
-# vs the auto per-cid ~640MB); the 2 result relays escape the auto FIFO
-# pairing via non-workspace names + a MANUAL alternating FIX flag
-# (40+j%2, truncated to slots 8/9 by GetffstMsg) with 1-late drain waits
-# (wait 40+(j+1)%2 <-> set 40+(j-1)%2) primed by a head-set before the loop.
-# bet rides a (NSLOT, 48) UB ring (the only loop-carried V state; inter's
-# dgkn_ring precedent).
+# fwd kernel 1: off-diagonal Aqk / Akk-beta' GEMMs (BK = DK).
+# anchor-free super-GEMM: the per-s2 anchors cancel inside every product
+# (qg_i * rhs_j = q_i k_j 2^(g_i-g_j)), so three full-width hi/lo operand
+# pairs feed 6 gemm_v0; Aqk gets the block-lower triangle, Akkbp the -beta
+# row scale.  FIXED-CORE striped task loop (task = cid + t*CORE_EFF,
+# past-GRID iterations idempotently recompute cid) with per-core relay
+# slots and a MANUAL alternating FIX flag; the drain runs 1-late so
+# C(j+1) overlaps produce(j)/drain(j).
 # ============================================================================
 @tilelang.jit(
     out_idx=[4],
@@ -230,7 +101,7 @@ def fla_chunk_intra_fwd_k_inter(B, S, H, DK, chunk_size=64, sub_chunk_size=16, s
     NT = S // BS
     GRID = NT * B * H
     BK = DK
-    # fixed-core striped decomposition (inter R1-iter2 recipe)
+    # fixed-core striped decomposition
     CORE_EFF = min(CORE_NUM, GRID)
     BASE = GRID // CORE_EFF
     L = BASE + 2  # produce t + drain t-1 for t in [0, BASE], + drain tail
@@ -282,7 +153,7 @@ def fla_chunk_intra_fwd_k_inter(B, S, H, DK, chunk_size=64, sub_chunk_size=16, s
             a_lo_f32 = T.alloc_shared([BS - BC, BK], "float32")
             hi_f32 = T.alloc_shared([BS, BK], "float32")
             lo_f32 = T.alloc_shared([BS, BK], "float32")
-            # ---- relay-source staging (dedicated per operand, G2 rule) ----
+            # ---- relay-source staging (dedicated UB source per operand) ----
             qt_hi_ub = T.alloc_shared([BS - BC, BK], "bfloat16")
             qt_lo_ub = T.alloc_shared([BS - BC, BK], "bfloat16")
             kta_hi_ub = T.alloc_shared([BS - BC, BK], "bfloat16")
@@ -306,10 +177,7 @@ def fla_chunk_intra_fwd_k_inter(B, S, H, DK, chunk_size=64, sub_chunk_size=16, s
             akk_ls = T.alloc_shared([BS - BC, BS], "bfloat16")
             z16 = T.alloc_shared([BC, BS], "bfloat16")
 
-            # ---- loop-invariant hoists + C-side head-set (prime the j=0
-            # drain wait; 1-late flag pairing: drain(j) waits the flag raised
-            # at iteration j-1 -- iteration 0 drains redirected data and its
-            # wait pairs with this one-time set; counting stays balanced) ----
+            # ---- head-set primes the j=0 1-late drain wait ----
             T.tile.fill(z16, 0.0)
             T.set_cross_flag("FIX", 41)
 
@@ -393,9 +261,7 @@ def fla_chunk_intra_fwd_k_inter(B, S, H, DK, chunk_size=64, sub_chunk_size=16, s
                 bb = bbh // H
                 bh = bbh % H
                 s0 = bs * BS
-                # 1-late: this drain reads task j-1's relays, so it waits the
-                # flag the Cube side raised at iteration j-1
-                # (pairing: wait 40+(j+1)%2 <-> set 40+(j-1)%2)
+                # 1-late drain: waits the flag raised at iteration j-1
                 T.wait_cross_flag(40 + (j + 1) % 2, "V")
                 T.copy(aqk_relay[cid, dslot, 0 : BS - BC, 0:BS], aqk_f32)
                 T.copy(akk_relay[cid, dslot, 0 : BS - BC, 0:BS], akk_f32)
@@ -438,13 +304,8 @@ def fla_chunk_intra_fwd_k_inter(B, S, H, DK, chunk_size=64, sub_chunk_size=16, s
 
 
 # ============================================================================
-# fwd kernel 2a: the 4 diagonal forward substitutions -> AidHi/Lo ws pair.
-# PURE VECTOR, split out of the fused k_g: the V->C relay
-# of the substitution result forced a per-block lockstep (msprof: the AIC
-# spent 9.7us/block waiting on the aid relay flag while its productive work
-# was 1.2us).  As a pure-V kernel it runs at full AIV throughput and writes
-# the ws pair the G-gemm kernel then reads DIRECTLY (same bytes as the old
-# relay round trip, zero flags).
+# fwd kernel 2a: the 4 diagonal forward substitutions -> AidHi/Lo ws pair
+# (pure Vector; the consumer GEMM kernel reads the pair directly GM->L1).
 # ============================================================================
 @tilelang.jit(pass_configs=PASS_CONFIGS)
 def fla_chunk_intra_fwd_k_subst(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
@@ -487,9 +348,7 @@ def fla_chunk_intra_fwd_k_subst(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
             ai_s2 = T.alloc_shared([BC, BC], "float32")
             ai_s3 = T.alloc_shared([BC, BC], "float32")
 
-            # ==== 4 forward substitutions (serialized; the chains have real
-            # row-to-row RAW dependencies -- see the rolled-back iter-4 ILP
-            # experiment) ====
+            # ==== 4 forward substitutions (row-to-row RAW, must serialize) ====
             T.copy(Akk_diag[bb, s0 : s0 + BS, bh, 0:BC], ad_f)
             T.copy(Mneg, mneg)
             T.copy(Meye, meye)
@@ -560,10 +419,7 @@ def fla_chunk_intra_fwd_k_subst(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 
 # ============================================================================
-# fwd kernel 2b: G = AiDiag @ Akkbp  (NO V->C relay: every operand is a
-# direct GM->L1 read of the pre-split ws pairs written by k_inter / k_subst,
-# so the AIC free-runs across blocks -- the old per-block lockstep on the
-# aid relay flag is gone).
+# fwd kernel 2b: G = AiDiag @ Akkbp (direct GM->L1 reads of the ws pairs).
 # ============================================================================
 @tilelang.jit(pass_configs=PASS_CONFIGS)
 def fla_chunk_intra_fwd_k_g(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
@@ -624,11 +480,8 @@ def fla_chunk_intra_fwd_k_g(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 
 # ============================================================================
-# fwd kernel 3: G2 = G @ G  (pre-split ws: both operands are DIRECT GM->L1
-# reads of the GHi/GLo pair written by k_g; A and B get separate L1 buffers
-# -- one L1 buffer carries only one zN layout.  No V-phase staging, no
-# relays.  G2's rows 0..32 are real zeros from the gemm (G rows 0..16 are
-# the zeros k_g staged), so the split pair is written full [64,64].)
+# fwd kernel 3: G2 = G @ G (direct GM->L1 reads; A and B get separate L1
+# buffers -- one L1 buffer carries only one zN layout).
 # ============================================================================
 @tilelang.jit(pass_configs=PASS_CONFIGS)
 def fla_chunk_intra_fwd_k_g2(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
@@ -685,12 +538,8 @@ def fla_chunk_intra_fwd_k_g2(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 
 # ============================================================================
-# fwd kernel 4: Y = (I + G2) @ AiDiag = AiDiag + G2 @ AiDiag
-# the I+ is folded into the V epilogue as an exact fp32 add
-# (Y = frag + Aid), strictly more precise than the old bf16 hi/lo split of
-# I+G2; both gemm operands are DIRECT GM->L1 reads of the pre-split ws pairs
-# (no V-phase staging, no relays); Aid fp32 is reconstructed hi+lo for the
-# epilogue add.  Output is the YHi/YLo pair.
+# fwd kernel 4: Y = AiDiag + G2 @ AiDiag (the I+ folds into the V epilogue
+# as an exact fp32 add; operands are direct GM->L1 ws reads).
 # ============================================================================
 @tilelang.jit(pass_configs=PASS_CONFIGS)
 def fla_chunk_intra_fwd_k_y(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
@@ -757,11 +606,8 @@ def fla_chunk_intra_fwd_k_y(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 
 # ============================================================================
-# fwd kernel 5: Ai = (I + G) @ Y = Y + G @ Y  -> bf16 Akk output
-# the I+ folds into the V epilogue (exact fp32 +Y); both
-# operands are DIRECT GM->L1 reads of the pre-split ws pairs; Y fp32 is
-# reconstructed hi+lo for the epilogue.  The block-upper-tri of the gemm
-# output stays computed-exact 0 (zero operands), single full bf16 write.
+# fwd kernel 5: Ai = Y + G @ Y -> bf16 Akk output (I+ folds into the V
+# epilogue as an exact fp32 add; single full bf16 write).
 # ============================================================================
 @tilelang.jit(out_idx=[4], pass_configs=PASS_CONFIGS)
 def fla_chunk_intra_fwd_k_ai(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
@@ -823,23 +669,14 @@ def fla_chunk_intra_fwd_k_ai(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 # ============================================================================
 # bwd kernel 1 of 2 (pure Vector, no Cube segment, no cross-core flags):
-#   stage every GEMM operand tile to GM scratch (OpscrM / Opscr).
-#   The kernel boundary (host-ordered launches) replaces the in-kernel V->C
-#   synchronization that the 16-slot ffts flag space cannot express for a
-#   40-relay operator (module docstring item 11).
-# mid-anchor super-GEMM staging: the per-s anchors (gn_s /
-# gn'_s) cancel exactly inside the D_s / V_s post-scaled sums, so ONE
-# shared operand per matrix role serves all 4 s blocks (16 logical gemms
-# -> 4).  Chunk-mid anchor a = g[2*BC, :] (per DK column) keeps every fp16
-# operand exponent within +-half-chunk decay (<= 2^12.2 at the -0.38/token
-# boundary case -- BELOW the old Kdec envelope 2^18.24 which already
-# overflowed there):
-#   K~  = k * 2^(a - g_j)        (B side of the dq2/dk2 row gemms)
-#   Q~  = q * 2^(g_j - a)        (B side of the dkt MdA^T gemm)
-#   KB~ = beta_j k_j * 2^(g_j - a)  (B side of the dkt MdK^T gemm)
-#   MdA/MdK stay full [64,64] Mlo-masked tiles -- the old KMAX column
-#   windows were redundant (MdA[i,j] = 0 for j > i >= 16*s already).
-# GM layouts (fp16; per (chunk, bh) program, cid = chunk-major):
+# stage every GEMM operand tile to GM scratch; the kernel boundary
+# (host-ordered launches) provides the V->C synchronization.  Chunk-mid
+# anchor a = g[2*BC, :] -- the per-s anchors cancel inside the D_s / V_s
+# post-scaled sums, so one shared operand per matrix role serves all 4
+# sub-chunk blocks and the fp16 exponents stay within +-half-chunk decay:
+#   K~  = k * 2^(a - g_j)         Q~  = q * 2^(g_j - a)
+#   KB~ = beta_j k_j * 2^(g_j - a)     MdA/MdK: full [64,64] Mlo-masked
+# GM layouts (fp16, per (chunk, bh) program):
 #   OpscrM [GRID, 4, 64, 64]: 0=mda_hi 1=mda_lo 2=mdk_hi 3=mdk_lo
 #   Opscr  [GRID, 2, 6, 64, BK] (per half): 0=k_hi 1=k_lo 2=q_hi 3=q_lo
 #                                      4=kb_hi 5=kb_lo
@@ -971,21 +808,14 @@ def fla_chunk_intra_bwd_k_stage(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
 
 # ============================================================================
 # bwd kernel 2 of 2: gemms + tail.  Pipelined(2, num_stages=1) over the DK
-# halves; body = one C run then one V run.
-# mid-anchor super-GEMM: 4 logical gemms per half (12
-# gemm_v0, was 48) over FULL [64,64] Md tiles and shared per-role decay
-# operands; the per-s D_s / V_s chains collapse to two shared [64,BK]
-# post-scale factors ea = 2^(g-a) (dq2/dk2 rows) and eam = 2^(a-g) (dkt
-# rows) -- the anchors cancelled inside the sums (a = g[2*BC, :]):
-#   dq2_pre = MdA @ K~ ;  dk2_pre = MdK @ K~        (row gemms, B side K~)
-#   dkt_pre = MdA^T @ Q~ + MdK^T @ KB~             (transpose_A gemms)
-#   dq2 = ea_row * dq2_pre + dq ; dk2b = ea_row*dk2_pre*beta ; dkt = eam*dkt_pre
-# C: GM->L1 whole-tile reads, 12 gemm_v0, L0C->GM direct fp32 frag writes
-#   (Fragscr, k1-precedent pattern), T.set_cross_flag("FIX", 9 + i_kk%2).
-# V: T.wait_cross_flag(9 + i_kk%2, "V"), GM->UB frag reads, the corrected
-#   tail with the shared post-scales, output writes, db_acc accumulation.
-# Cross-core flag budget: exactly 2 IDs (9, 10) -- no implicit relays, no
-# workspace-named GM tensors, so the AUTO_CV_SYNC pass adds none.
+# halves; body = one C run then one V run.  Post-scales (a = g[2*BC, :]):
+#   dq2_pre = MdA @ K~ ;  dk2_pre = MdK @ K~        (row gemms)
+#   dkt_pre = MdA^T @ Q~ + MdK^T @ KB~              (transpose_A gemms)
+#   dq2 = ea*dq2_pre + dq ; dk2b = ea*dk2_pre*beta ; dkt = eam*dkt_pre
+#     (ea = 2^(g-a) row-wise, eam = 2^(a-g))
+# C: GM->L1 whole-tile reads, 12 hi/lo gemm_v0, L0C->GM direct fp32 frag
+#   writes (Fragscr) + set_cross_flag("FIX", 9 + i_kk%2).
+# V: wait_cross_flag, frag readback, corrected tail + db_acc accumulation.
 # Fragscr layout (per (cid, half), rows): 0:64=dq2, 64:128=dk2, 128:192=dkt.
 # ============================================================================
 @tilelang.jit(out_idx=[14, 15, 16], pass_configs=PASS_CONFIGS)
@@ -1236,22 +1066,15 @@ def fla_chunk_intra_bwd_k_gemm(B, S, H, DK, chunk_size=64, sub_chunk_size=16):
                 T.copy(dk2_ub, dk2[bb, s0 + 3 * BC : s0 + 4 * BC, bh, ik0:ik1])
 
             # ---- epilogue: db2 scatter via GM scratch + intra-core flag ----
-            # db2d is [BS, 8] (2KB): the [64,1]-region GM->UB read scatters its
-            # 4B bursts into 32B slots (MTE "narrow rows sit in 32B slots"
-            # convention, issue-#1682 class) and the [64,1] GM write reads
-            # them back from the same slots -- the pair self-compensates, but
-            # only while the final GM stride exceeds 4B (H >= 2); the wide
-            # buffer keeps the scattered writes inside db2d (no UB-neighbor
-            # clobber). H == 1 (contiguous slice) uses a flat 1-D round trip.
+            # [64,1] copies round-trip through 32B slots and only self-
+            # compensate while the GM row stride exceeds 4B (H >= 2); the
+            # wide db2d keeps the scattered writes contained.  H == 1 uses
+            # the flat 1-D view instead (no narrow rows).
             if H == 1:
-                # H=1: the db2 slice is CONTIGUOUS -- write it as a single
-                # 256B row through the flat view (no narrow rows at all).
+                # H == 1: contiguous slice, single flat-view row write
                 T.copy(db_acc, db2f[bb, s0 : s0 + BS])
             else:
-                # H>=2 star-chain (fla_wy_fast precedent): the [64,1]-region
-                # GM->UB read scatters 4B bursts into 32B slots and the write
-                # reads them back from the same slots (the pair compensates);
-                # the flag covers the computed-source GM visibility.
+                # H >= 2: the [64,1] read/write slot pair self-compensates;
                 T.copy(db_acc, db2flat[cid, 0:BS])
                 T.set_flag("MTE3", "MTE2", 0)
                 T.wait_flag("MTE3", "MTE2", 0)
@@ -1330,9 +1153,7 @@ def fla_chunk_intra_fwd_inter_solve_fused(q, k, gk, beta, Akk_diag, chunk_size=6
     beta_flat = beta.view(B, S * H)  # zero-copy metadata view
     mneg = _get_mneg(device, sub_chunk_size)
 
-    # cross-kernel GM workspaces (host torch.empty): pre-split bf16 hi/lo
-    # pairs -- the consumer kernels read them directly GM->L1 in their C
-    # sections (no relay); bytes match the old 5x fp32 tensors
+    # cross-kernel GM workspaces: pre-split bf16 hi/lo pairs
     bf16_pair = lambda: (  # noqa: E731
         torch.empty(B, S, H, chunk_size, dtype=torch.bfloat16, device=device),
         torch.empty(B, S, H, chunk_size, dtype=torch.bfloat16, device=device),
@@ -1408,8 +1229,7 @@ def fla_chunk_intra_bwd_intra(q, k, g, beta, dAqk, dAkk, dq, dk, db, dg, chunk_s
     k_stage(q, k, g, beta_flat, mlo, dAqk, dAkk, opscrm, opscr)
     k_gemm = fla_chunk_intra_bwd_k_gemm(B, S, H, DK, chunk_size, sub_chunk_size)
     dq2, dk2, dg2 = k_gemm(q, k, g, beta_flat, dq, dk, dg, opscrm, opscr, fragscr, db2flat, db2flat_v, db2, db2f)
-    # NK=1 partial (both DK halves accumulate in-program); zero-copy view to
-    # honor the [NK,B,S,H] output contract
+    # NK=1 partial (both DK halves accumulate in-program); zero-copy view
     return dq2, dk2, db2.view(1, B, S, H), dg2
 
 
